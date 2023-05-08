@@ -14,4 +14,4 @@ Please read the conditions you need to comply with in order to contribute to thi
 
 ## License
 
-The `image-render-base` package is licenced under the Apache-2.0 license. See the [LICENSE](LICENSE.md) file for more details.
+The `image-render-automation` package is licenced under the Apache-2.0 license. See the [LICENSE](LICENSE.md) file for more details.
