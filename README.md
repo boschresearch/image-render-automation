@@ -1,6 +1,10 @@
 # Image-Render Automation Functions
 
+**Check out the `stable` branch for the latest stable version**
+
 Rendering automation functionality used by all `image-render-xxx` modules.
+
+See the repository `image-render-setup` for more information and documentation on the `image-render` automation system.
 
 ## Purpose of the project
 
