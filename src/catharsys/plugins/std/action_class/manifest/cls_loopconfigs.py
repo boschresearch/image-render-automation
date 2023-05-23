@@ -46,6 +46,7 @@ class CLoopConfigs:
 
     lScheme: list = None
     dicCfgCache: dict = None
+    dicProcCfgCache: dict = None
 
     sId: str = None
     sCfgPath: str = None
@@ -316,6 +317,8 @@ class CLoopConfigs:
                 "sRelPathCfg": os.path.normpath(os.path.sep.join(lCfgIdFolders)),
                 "iCfgIdx": len(lCfgIds) - 1,
                 "sCfgId": sCfgId,
+                "iLevelIdx": iIdx,
+                "iLevelCnt": dicLevel["iCnt"],
             }
         # endfor
         # dTimeEnd = timer()
@@ -404,13 +407,24 @@ class CLoopConfigs:
         for iProcPass in range(2):
             bPreProcessOnly = iProcPass == 0
 
-            for sId, dicCfgMeta in dicCfgIdMeta.items():
-                self._SetCfgVarsCurrentId(xCfgVars, sId)
-
+            # for sId, dicCfgMeta in dicCfgIdMeta.items():
+            for sId in lIds:
+                dicCfgMeta = dicCfgIdMeta[sId]
                 sDti = dicCfgMeta.get("sDTI")
                 iDataListIdx = dicCfgMeta.get("iDataListIdx")
+                iLevelIdx = dicCfgMeta["iLevelIdx"]
+                iLevelCnt = dicCfgMeta["iLevelCnt"]
                 lCfgData = dicData.get(sDti)
-                xCfg = lCfgData[iDataListIdx]
+
+                # Test whether data is in process cache
+                sProcCfgCacheHash = self._GetProcCfgCacheHash(sId, iLevelIdx, iDataListIdx)
+                if bPreProcessOnly is True and sProcCfgCacheHash in self.dicProcCfgCache:
+                    xCfg = copy.deepcopy(self.dicProcCfgCache[sProcCfgCacheHash])
+                else:
+                    xCfg = lCfgData[iDataListIdx]
+                # endif data in process cache
+
+                self._SetCfgVarsCurrentId(xCfgVars, sId)
                 if isinstance(xCfg, dict):
                     sImportPath = config.GetDictValue(
                         xCfg,
@@ -427,9 +441,15 @@ class CLoopConfigs:
                 # endif
 
                 try:
-                    lCfgData[iDataListIdx] = xCfgVars.Process(
-                        xCfg, sImportPath=sImportPath, bPreProcessOnly=bPreProcessOnly
-                    )
+                    dicCfg = xCfgVars.Process(xCfg, sImportPath=sImportPath, bPreProcessOnly=bPreProcessOnly)
+                    lCfgData[iDataListIdx] = dicCfg
+
+                    # Cache a copy of the processed config.
+                    if bPreProcessOnly is False:
+                        if sProcCfgCacheHash not in self.dicProcCfgCache:
+                            self.dicProcCfgCache[sProcCfgCacheHash] = copy.deepcopy(dicCfg)
+                        # endif
+                    # endif
                 except ison.ParserError as xEx:
                     sFpConfig = config.GetDictValue(
                         xCfg,
@@ -544,6 +564,13 @@ class CLoopConfigs:
 
         # Reset configuration file cache
         self.dicCfgCache = {}
+        self.dicProcCfgCache = {}
+
+    # enddef
+
+    #################################################################
+    def _GetProcCfgCacheHash(self, _sId: str, _iLevelIdx: int, _iDataListIdx: int):
+        return f"{_sId}-{_iLevelIdx}-{_iDataListIdx}"
 
     # enddef
 
@@ -575,6 +602,14 @@ class CLoopConfigs:
                 break
             else:
                 dicLevel["iIdx"] = 0
+                # Reset the corresponding processed config cache
+                sId: str = dicLevel["sId"]
+                sHash: str
+                lInvalidHashes: list[str] = [sHash for sHash in self.dicProcCfgCache if sHash.startswith(sId)]
+                for sHash in lInvalidHashes:
+                    del self.dicProcCfgCache[sHash]
+                # endfor
+
                 if iLevelIdx == 0:
                     bOK = False
                 # endif
