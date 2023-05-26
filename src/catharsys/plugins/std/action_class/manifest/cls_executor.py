@@ -51,6 +51,8 @@ from catharsys.plugins.std.action_class.manifest.cls_cfg_manifest import CConfig
 from catharsys.plugins.std.action_class.manifest.cls_cfg_manifest_job import (
     CConfigManifestJob,
 )
+from catharsys.plugins.std.action_class.manifest import utils
+
 from catharsys.config.cls_project import CProjectConfig
 from catharsys.config.cls_launch import CConfigLaunch
 from catharsys.action.cls_actionclass_executor import CActionClassExecutor
@@ -60,7 +62,6 @@ import concurrent.futures
 
 
 class CActionClassManifestExecutor(CActionClassExecutor):
-
     ######################################################################################
     def __init__(
         self,
@@ -71,7 +72,6 @@ class CActionClassManifestExecutor(CActionClassExecutor):
         xCfgLaunch: CConfigLaunch,
         dicActArgsOverride: Optional[dict] = None,
     ):
-
         self.xManifest: CConfigManifest = None
         self.dicActArgs: dict = None
         self.dicActGlobals: dict = None
@@ -113,7 +113,6 @@ class CActionClassManifestExecutor(CActionClassExecutor):
     # Init Action
     @logFunctionCall
     def Init(self):
-
         # initialize configuration variables that are passed as constant variables,
         # when parsing the various configuration scripts
         self.dicCfgVars = self.xPrjCfg.GetFilepathVarDict(self.xPrjCfg.pathLaunchFile)
@@ -242,18 +241,17 @@ class CActionClassManifestExecutor(CActionClassExecutor):
     # Execute action
     @logFunctionCall
     def Execute(self, bDoProcess: bool = True, dicDebug: bool = None) -> CConfigManifestJob:
-
         self.dicDebug = dicDebug
 
         sDT = datetime.now().strftime("%Y-%m-%d_%H-%M-%S")
 
+        # Get the configuration loops
+        sFpTrial = config.GetDictValue(
+            self.dicTrial, "__locals__/filepath", str, bAllowKeyPath=True, sWhere="trial file"
+        )
+
         # Get random seed for random values in configs
-        iRandomSeed = self.dicTrial.get("iRandomSeed")
-        if iRandomSeed is None:
-            iRandomSeed = self.dicTrial["iRandomSeed"] = 0
-        # endif
-        random.seed(iRandomSeed)
-        np.random.seed(iRandomSeed)
+        utils.ApplyConfigRandomSeed(self.dicTrial, _bApplyToConfig=True, _sConfigFilename=sFpTrial)
 
         # Get the configuration loops
         # sFpTrial = config.GetDictValue(self.dicTrial, "__locals__/filepath", str,
@@ -422,7 +420,6 @@ class CActionClassManifestExecutor(CActionClassExecutor):
     # Execute single job
     @logFunctionCall
     def _ExecJobs_SingleAll(self, *, sId, dicJob, bDoProcess=True):
-
         # This job distribution scheme simply enforces
         # iFrameGroups = 1 and iConfigGroups = 0.
         # In this way, there is one job per config that processes all frames.
@@ -437,7 +434,6 @@ class CActionClassManifestExecutor(CActionClassExecutor):
     # Execute jobs with distribution over frames
     @logFunctionCall
     def _ExecJobs_FramesConfigs(self, *, sId, dicJob, bDoProcess=True):
-
         iFrameFirst = self.dicActArgs.get("iFrameFirst", 0)
         iFrameLast = self.dicActArgs.get("iFrameLast", 0)
         iFrameStep = self.dicActArgs.get("iFrameStep", 1)
@@ -498,7 +494,6 @@ class CActionClassManifestExecutor(CActionClassExecutor):
                 lJobConfigs = dicJob["lConfigs"][iCfgStart:iCfgEnd]
 
                 for iFrameGrpIdx in range(iFrameGroups):
-
                     sFileJobConfig = "{0}_job{1:02d}.json".format(sIdName, iJobIdx + 1)
                     pathJobConfig = Path(dicJob["sPathJobConfigMain"]) / sFileJobConfig
                     sJobName = "{0}:{1:02d}/{2:02d}".format(sIdName, iJobIdx + 1, iJobCnt)
@@ -563,7 +558,6 @@ class CActionClassManifestExecutor(CActionClassExecutor):
     # Execute jobs with distribution over frames
     @logFunctionCall
     def _ExecJobs_PerFrameConfigs(self, *, sId, dicJob, bDoProcess=True):
-
         iFrameFirst = self.dicActArgs.get("iFrameFirst", 0)
         iFrameLast = self.dicActArgs.get("iFrameLast", 0)
         iFrameStep = self.dicActArgs.get("iFrameStep", 1)
@@ -624,7 +618,6 @@ class CActionClassManifestExecutor(CActionClassExecutor):
             iJobIdx = 0
             # Loop over frames
             for iFrameIdx in range(iFrameFirst, iFrameLast + 1, iFrameStep):
-
                 # Loop over configs
                 for iConfigGrpIdx in range(iConfigGroups):
                     iCfgStart = iConfigGrpIdx * iConfigsPerGroup
@@ -634,7 +627,6 @@ class CActionClassManifestExecutor(CActionClassExecutor):
 
                     # Loop over jobs per frame
                     for iSubFrameIdx in range(iSubFrameGroups):
-
                         sFileJobConfig = "{0}_frm{1:02d}_job{2:02d}.json".format(sIdName, iFrameIdx, iJobIdx + 1)
                         pathJobConfig = Path(dicJob["sPathJobConfigMain"]) / sFileJobConfig
                         sJobName = "{0}:{1}/{2}>{3}.{4}.{5}".format(
@@ -708,7 +700,6 @@ class CActionClassManifestExecutor(CActionClassExecutor):
     ###############################################################################
     @logFunctionCall
     def StartJob(self, *, pathJobConfig, sJobName, sJobNameLong):
-
         dicArgs = {
             "pathJobConfig": pathJobConfig,
             "sJobName": sJobName,
@@ -726,7 +717,6 @@ class CActionClassManifestExecutor(CActionClassExecutor):
     def StartJobParallel(
         self, *, pathJobConfig: Path, sJobName: str, sJobNameLong: str, xExecutor: concurrent.futures.ThreadPoolExecutor
     ):
-
         dicArgs = {
             "pathJobConfig": pathJobConfig,
             "sJobName": sJobName,
