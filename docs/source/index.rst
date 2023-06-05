@@ -32,7 +32,8 @@ The automation system for action execution
    :maxdepth: 2
    :caption: Contents:
 
-   workspace_basics
+   workspace/basics
+   workspace/level-1
    config_proc
    license
 
