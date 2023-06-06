@@ -109,9 +109,13 @@ To initialize a workspace configuration project for Blender rendering use the co
 `cathy blender init -c [configuration project name] --addons`
 ::: 
 
-In the above example, the configuration project name could be `trial-01` or `trial-02`. If you run the command without the `--addons` flag, it will check whether the Catharsys modules are installed in Blender and install them when needed. This can be useful, when you updated to a newer Catharsys version. But this only needs to be done once, independent of the configuration.
+In the above example, the configuration project name could be `trial-01` or `trial-02`. If you run the command without the `--addons` flag, it will check whether the Catharsys modules are installed in Blender and install them when needed. This can be useful, when you updated to a newer Catharsys version. But this only needs to be done once, independent of the configuration. To initialize all configurations at once, use the command,
+
+:::{admonition} Shell
+`cathy blender init --all --addons`
+:::
 
 ## What's next
 
-Now have a look at the {doc}`action configuration <action_main>`.
+Now have a look at the most basic configuration: {doc}`just render <level-1>`.
 
