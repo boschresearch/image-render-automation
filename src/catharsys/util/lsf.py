@@ -33,23 +33,18 @@ from pathlib import Path
 import tempfile
 import platform
 
-from typing import Union
+from typing import Union, Tuple
 from anybase import assertion, shell
 from anybase.cls_any_error import CAnyError_Message
 import catharsys.plugins.std
+from catharsys.config.cls_exec_lsf import CConfigExecLsf
+
 
 ################################################################################################
-def ExecBSub(
-    *, sCommands: str, bDoPrint: bool = False, bDoPrintOnError: bool = False
-) -> Union[bool, list[str]]:
-
+def ExecBSub(*, sCommands: str, bDoPrint: bool = False, bDoPrintOnError: bool = False) -> Tuple[bool, list[str]]:
     # Only supported on Linux platforms
     if platform.system() != "Linux":
-        raise CAnyError_Message(
-            sMsg="Unsupported system '{}' for LSF job creation".format(
-                platform.system()
-            )
-        )
+        raise CAnyError_Message(sMsg="Unsupported system '{}' for LSF job creation".format(platform.system()))
     # endif
 
     ##################################################################################
@@ -82,6 +77,92 @@ def ExecBSub(
     pathFileBsub.unlink()
 
     return bOk, lStdOut
+
+
+# enddef
+
+
+# #################################################################################################
+def Execute(
+    *,
+    _sJobName: str,
+    _xCfgExecLsf: CConfigExecLsf,
+    _sScript: str,
+    _bDoPrint: bool = True,
+    _bDoPrintOnError: bool = True,
+) -> Tuple[bool, list[str]]:
+    if len(_xCfgExecLsf.lModules) > 0:
+        sSetLoadModules = "module load {0}".format(" ".join(_xCfgExecLsf.lModules))
+    else:
+        sSetLoadModules = ""
+    # endif
+
+    if _xCfgExecLsf.iJobMemReqGb == 0:
+        sSetMemReq = ""
+    else:
+        sSetMemReq = f"#BSUB -M {_xCfgExecLsf.iJobMemReqGb}G"
+    # endif
+
+    if _xCfgExecLsf.iJobMaxTime == 0:
+        sSetJobMaxTime = ""
+    else:
+        sSetJobMaxTime = f"#BSUB -W {_xCfgExecLsf.iJobMaxTime}"
+    # endif
+
+    if _xCfgExecLsf.iJobGpuCores > 0:
+        if _xCfgExecLsf.bIsLsbGpuNewSyntax is False:
+            sSetGpuCount = f'#BSUB -R "rusage[ngpus_excl_p={_xCfgExecLsf.iJobGpuCores}]"'
+        else:
+            sSetGpuCount = f'#BSUB -gpu "num={_xCfgExecLsf.iJobGpuCores}/task:mode=exclusive_process"'
+        # endif
+    else:
+        sSetGpuCount = ""
+    # endif
+
+    if _xCfgExecLsf.sJobQueue is None:
+        sSetJobQueue = ""
+    else:
+        sSetJobQueue = f"#BSUB -q {_xCfgExecLsf.sJobQueue}"
+    # endif
+
+    if len(_xCfgExecLsf.lJobHosts) == 0:
+        sSetJobHosts = ""
+    else:
+        sHostList = " ".join(_xCfgExecLsf.lJobHosts)
+        sSetJobHosts = f"#BSUB -m {sHostList}"
+    # endif
+
+    if len(_xCfgExecLsf.lJobExcludeHosts) == 0:
+        sSetJobExcludeHosts = ""
+    else:
+        lCommands = [f"hname!='{x}'" for x in _xCfgExecLsf.lJobExcludeHosts]
+        sCommand = " && ".join(lCommands)
+        sSetJobExcludeHosts = f'#BSUB -R"{sCommand}"'
+    # endif
+
+    sBsubScript = f"""
+        # ####################################
+        # #BSUB Settings
+
+        #BSUB -J {_sJobName}
+        #BSUB -o lsf/%J/stdout.txt
+        #BSUB -e lsf/%J/stderr.txt
+        {sSetJobMaxTime}
+        {sSetJobQueue}
+        {sSetGpuCount}
+        {sSetMemReq}
+        {sSetJobHosts}
+        {sSetJobExcludeHosts}
+
+        module purge
+        {sSetLoadModules}
+
+        # ####################################
+        # Script to execute
+        {_sScript}
+    """
+
+    return ExecBSub(sCommands=sBsubScript, bDoPrint=_bDoPrint, bDoPrintOnError=_bDoPrintOnError)
 
 
 # enddef
