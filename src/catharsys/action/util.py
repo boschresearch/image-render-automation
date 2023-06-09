@@ -33,7 +33,7 @@ import catharsys.util.path as cathpath
 
 ##################################################################################################################
 def GetParentConfigTargetPath(_dicCfg: dict, _sWhere: str = None) -> Path:
-    assertion.FuncArgTypes()
+    # assertion.FuncArgTypes()
 
     sWhere: str
     if not isinstance(_sWhere, str):
