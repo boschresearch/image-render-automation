@@ -36,6 +36,7 @@ from pathlib import Path
 from typing import Optional
 
 import ison
+from ison.util.data import AddLocalGlobalVars
 from ison.core.cls_parser_error import CParserError
 
 from anybase.cls_any_error import CAnyError_Message, CAnyError_TaskMessage
@@ -74,12 +75,10 @@ class CActionClassManifestExecutor(CActionClassExecutor):
     ):
         self.xManifest: CConfigManifest = None
         self.dicActArgs: dict = None
-        self.dicActGlobals: dict = None
         self.dicActionDti: dict = None
         self.dicTrial: dict = None
         self.dicExec: dict = None
         self.dicDebug: dict = None
-        self.dicActGlobals: dict = None
         self.dicCfgVars: dict = None
         self.pathTrialFile: Path = None
         self.pathExecFile: Path = None
@@ -88,6 +87,8 @@ class CActionClassManifestExecutor(CActionClassExecutor):
         self.lJobDistTypes: list = ["single;all", "frames;configs", "per-frame;configs"]
         self.sJobDistType: str = None
         self.sPathTrialConfig: str = None
+
+        self.xCML: CConfigCML = None
 
         self.dicJobFutures: dict = {}
 
@@ -144,16 +145,20 @@ class CActionClassManifestExecutor(CActionClassExecutor):
         self.sPathTrialConfig = self.xPrjCfg.sLaunchPath  # self.dicActArgs.get("sConfigPath")
         dicVars = self.xPrjCfg.GetFilepathVarDict(self.sPathTrialConfig)
 
-        self.dicActGlobals = self.dicActions[self.sAction].get("__globals__")
-        dicActEvalGlobals = self.dicActions[self.sAction].get("__eval_globals__")
-        if isinstance(self.dicActGlobals, dict) and isinstance(dicActEvalGlobals, dict):
-            ison.util.data.UpdateDict(self.dicActGlobals, dicActEvalGlobals, "launch", bAllowOverwrite=True)
-        # endif
-        if isinstance(self.dicActGlobals, dict):
-            ison.util.data.UpdateDict(self.dicCfgVars, self.dicActGlobals, "launch")
-        # endif
+        ######################################################################################
+        # Create Parser
+        self.xCML = CConfigCML(
+            xPrjCfg=self.xPrjCfg,
+            dicConstVars=self.dicCfgVars,
+            dicRtVars=self.xCfgLaunch.dicRuntimeVars,
+            setRtVarsEval=self.xCfgLaunch.setRuntimeVarsEval,
+        )
 
-        # raise RuntimeError("DEBUG")
+        # adds globals of launch file to parser instance
+        dicGlobals = {}
+        ison.util.data.AddLocalGlobalVars(dicGlobals, self.dicActions[self.sAction], bLocalVars=False)
+        dicGlobals = self.xCML.Process(dicGlobals)
+
         ######################################################################################
         # Load & process TRIAL configuration
         sTrialFile = self.dicActArgs.get("sTrialFile")
@@ -162,17 +167,11 @@ class CActionClassManifestExecutor(CActionClassExecutor):
         # endif
 
         self.pathTrialFile = config.ProvideReadFilepathExt((self.sPathTrialConfig, sTrialFile))
-        xCML = CConfigCML(
-            xPrjCfg=self.xPrjCfg,
-            dicConstVars=self.dicCfgVars,
-            sImportPath=self.pathTrialFile.as_posix(),
-            dicRtVars=self.xCfgLaunch.dicRuntimeVars,
-            setRtVarsEval=self.xCfgLaunch.setRuntimeVarsEval,
-        )
 
         self.dicTrial = config.Load(self.pathTrialFile, sDTI="trial:1", bAddPathVars=True, dicCustomVars=dicVars)
         try:
-            self.dicTrial = xCML.Process(self.dicTrial)
+            self.dicTrial = self.xCML.Process(self.dicTrial, sImportPath=self.pathTrialFile.parent.as_posix())
+
         except CParserError as xEx:
             raise CAnyError_TaskMessage(sTask="Processing trial configuration", sMsg=xEx.ToString())
         # endtry
@@ -180,6 +179,7 @@ class CActionClassManifestExecutor(CActionClassExecutor):
         # add the processed trial data to the variables, so that
         # they can be used when processing the execution config
         self.dicCfgVars["trial"] = copy.deepcopy(self.dicTrial)
+        self.xCML.UpdateConstVars(self.dicCfgVars, _bAllowOverwrite=True, _bPrintWarnings=False)
 
         ######################################################################################
         # Load & process EXECUTION configuration
@@ -193,20 +193,25 @@ class CActionClassManifestExecutor(CActionClassExecutor):
         # endif
 
         self.pathExecFile = config.ProvideReadFilepathExt((self.sPathTrialConfig, sExecFile))
-        xCML = CConfigCML(
-            xPrjCfg=self.xPrjCfg,
-            sImportPath=self.pathExecFile,
-            dicRtVars=self.xCfgLaunch.dicRuntimeVars,
-            setRtVarsEval=self.xCfgLaunch.setRuntimeVarsEval,
-        )
+        # xCML = CConfigCML(
+        #     xPrjCfg=self.xPrjCfg,
+        #     sImportPath=self.pathExecFile,
+        #     dicRtVars=self.xCfgLaunch.dicRuntimeVars,
+        #     setRtVarsEval=self.xCfgLaunch.setRuntimeVarsEval,
+        # )
         self.dicExec = config.Load(self.pathExecFile, sDTI=sExecDti, dicCustomVars=dicVars, bAddPathVars=True)
-        self.dicExec = xCML.Process(self.dicExec)
+        try:
+            self.dicExec = self.xCML.Process(self.dicExec, sImportPath=self.pathExecFile.parent.as_posix())
+        except CParserError as xEx:
+            raise CAnyError_TaskMessage(sTask="Processing execution configuration", sMsg=xEx.ToString())
+        # endtry
 
         self.dicCfgVars["exec"] = copy.deepcopy(self.dicExec)
+        self.xCML.UpdateConstVars(self.dicCfgVars, _bAllowOverwrite=True, _bPrintWarnings=False)
 
         ######################################################################################
         # Load & process MANIFEST specified in trial
-        self.xManifest = CConfigManifest(xPrjCfg=self.xPrjCfg)
+        self.xManifest = CConfigManifest(xPrjCfg=self.xPrjCfg, _xCML=self.xCML)
 
         sFileManifest = self.dicTrial.get("sManifestFile")
         if sFileManifest is None:
@@ -215,7 +220,7 @@ class CActionClassManifestExecutor(CActionClassExecutor):
         self.pathManifestFile = config.ProvideReadFilepathExt((self.sPathTrialConfig, sFileManifest))
         self.xManifest.LoadFile(self.pathManifestFile)
         # Get trial configurations according to manifest
-        self.lTrialCfgs = self.xManifest.GetTrialConfigs(self.sAction, self.dicTrial, dicCfgVars=self.dicCfgVars)
+        self.lTrialCfgs = self.xManifest.GetTrialConfigs(self.sAction, self.dicTrial)  # , dicCfgVars=self.dicCfgVars)
 
     # enddef
 
@@ -290,11 +295,10 @@ class CActionClassManifestExecutor(CActionClassExecutor):
             # print(f"Create config {iCfgIdx} of {iCfgCnt}")
 
             # dTimeStart = timer()
-            dicData = xLoopConfigs.GetData(
-                dicCfgVars=self.dicCfgVars,
-                dicRuntimeVars=self.xCfgLaunch.dicRuntimeVars,
-                setRuntimeVarsEval=self.xCfgLaunch.setRuntimeVarsEval,
-            )
+            # The GetData() function copies the state of self.xCML into a new parser instance,
+            # which is then used to parse the configs for one config set.
+            dicData = xLoopConfigs.GetData(self.xCML)
+
             # dTimeEnd = timer()
             # print("GetData: {:5.2f}s".format(dTimeEnd - dTimeStart))
 
@@ -304,14 +308,15 @@ class CActionClassManifestExecutor(CActionClassExecutor):
                 continue
             # endif
 
-            # Add the action globals to the config dictionary
-            if isinstance(self.dicActGlobals, dict):
-                ison.util.data.AddLocalGlobalVars(
-                    dicData["mData"],
-                    {"__globals__": self.dicActGlobals},
-                    "launch globals",
-                )
-            # endif
+            # # Add the action globals to the config dictionary
+            # ison.util.data.AddLocalGlobalVars(
+            #     dicData["mData"],
+            #     {
+            #         "__globals__": self.xCML.dicVarGlo,
+            #         "__func_globals__": self.xCML.dicVarFuncGlo,
+            #     },
+            #     "globals",
+            # )
 
             # print("Configuration index: {0}".format(iCfgIdx))
 

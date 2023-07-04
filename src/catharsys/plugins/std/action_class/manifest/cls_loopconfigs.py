@@ -40,7 +40,6 @@ import ison
 
 
 class CLoopConfigs:
-
     xPrjCfg: CProjectConfig = None
     pathCfgFile: Path = None
 
@@ -55,7 +54,6 @@ class CLoopConfigs:
     #################################################################
     # Constructor
     def __init__(self, *, xPrjCfg, sId, sCfgFilePath, lScheme):
-
         self.sId = sId
 
         self.xPrjCfg = xPrjCfg
@@ -91,7 +89,6 @@ class CLoopConfigs:
     #################################################################
     # Get current value of level config
     def _GetLevelValue(self, _dicLevel):
-
         iIdx = _dicLevel.get("iIdx")
         lValues = _dicLevel.get("lValues")
         return lValues[iIdx]
@@ -101,7 +98,6 @@ class CLoopConfigs:
     #################################################################
     # Check whether given level is filtered
     def IsFiltered(self, _dicLevel, _xCfgVars):
-
         sId = _dicLevel.get("sId")
         self._SetCfgVarsCurrentId(_xCfgVars, sId)
 
@@ -155,7 +151,6 @@ class CLoopConfigs:
 
     #################################################################
     def _SetCfgVarsCurrentId(self, _xCfgVars, _sId):
-
         dicVar = _xCfgVars.GetVarData()
         dicVarCfgId = dicVar.get("id")
         dicVarCfgMeta = dicVarCfgId.get(_sId)
@@ -169,13 +164,12 @@ class CLoopConfigs:
     #################################################################
     # Get config data for current loop step
     @logFunctionCall
-    def GetData(self, dicCfgVars={}, *, dicRuntimeVars=None, setRuntimeVarsEval=None):
-
+    def GetData(self, _xCML: CConfigCML = None):  # dicCfgVars={}, *, dicRuntimeVars=None, setRuntimeVarsEval=None):
         if self.iTotalIdx < 0 or self.iTotalIdx >= self.iTotalCnt:
             raise Exception("Loop index ({0}) out of range.".format(self.iTotalIdx))
         # endif
 
-        dicVars = copy.deepcopy(dicCfgVars)
+        # dicVars = copy.deepcopy(dicCfgVars)
 
         lCfgIds = []
         lCfgIdFolders = []
@@ -184,15 +178,15 @@ class CLoopConfigs:
         lAct = []
         lIds = []
         dicData = {}
-        xConfigCML = CConfigCML(
-            xPrjCfg=self.xPrjCfg, dicConstVars=dicCfgVars, dicRtVars=dicRuntimeVars, setRtVarsEval=setRuntimeVarsEval
+        xCML = CConfigCML(
+            xPrjCfg=self.xPrjCfg,
+            xParser=_xCML,  # dicConstVars=dicCfgVars, dicRtVars=dicRuntimeVars, setRtVarsEval=setRuntimeVarsEval
         )
-
+        dicVars = {}
         # dTimeStart = timer()
 
         for dicLevel in self.lScheme:
-
-            xConfigCML.Clear()
+            # xConfigCML.Clear()
 
             iIdx = dicLevel.get("iIdx")
             sDti = dicLevel.get("sDTI")
@@ -231,7 +225,7 @@ class CLoopConfigs:
                     )
 
                     if "sId" in dicCfg:
-                        lId = xConfigCML.Process(
+                        lId = xCML.Process(
                             dicCfg,
                             lProcessPaths=["sId"],
                             sImportPath=dicCfg["__locals__"]["path"],
@@ -324,6 +318,9 @@ class CLoopConfigs:
         # dTimeEnd = timer()
         # print("Load configs: {}s".format(dTimeEnd - dTimeStart))
 
+        # ##########################################################################################
+        # ##########################################################################################
+
         sRelPathTrgMain = path.MakeNormPath((self.sId, lCfgIdFolders)).as_posix()
 
         dicRelPathTrgAct = {}
@@ -366,17 +363,24 @@ class CLoopConfigs:
         # endfor
         dicVars["id"] = dicVarCfgId
 
-        # Create config vars instance
-        xCfgVars = CConfigCML(
+        xCML = CConfigCML(
             xPrjCfg=self.xPrjCfg,
-            dicConstVars=dicVars,
-            sImportPath=self.sCfgPath,
-            dicRtVars=dicRuntimeVars,
-            setRtVarsEval=setRuntimeVarsEval,
+            xParser=_xCML,
         )
 
+        xCML.UpdateConstVars(dicVars, _bAllowOverwrite=True)
+
+        # Create config vars instance
+        # xCfgVars = CConfigCML(
+        #     xPrjCfg=self.xPrjCfg,
+        #     dicConstVars=dicVars,
+        #     sImportPath=self.sCfgPath,
+        #     dicRtVars=dicRuntimeVars,
+        #     setRtVarsEval=setRuntimeVarsEval,
+        # )
+
         # Create parent/child references
-        dicVarCfgId = xCfgVars.GetVarData().get("id")
+        dicVarCfgId = xCML.GetVarData().get("id")
         for sId, dicCfgMeta in dicCfgIdMeta.items():
             iCfgIdx = dicCfgMeta.get("iCfgIdx")
             sParentId = None if iCfgIdx <= 0 else lIds[iCfgIdx - 1]
@@ -390,10 +394,8 @@ class CLoopConfigs:
                 {
                     "parent": {"dti": ""}
                     if sParentId is None
-                    else xCfgVars.GetVarDataRef(["id", sParentId], bLiteral=True),
-                    "child": {"dti": ""}
-                    if sChildId is None
-                    else xCfgVars.GetVarDataRef(["id", sChildId], bLiteral=True),
+                    else xCML.GetVarDataRef(["id", sParentId], bLiteral=True),
+                    "child": {"dti": ""} if sChildId is None else xCML.GetVarDataRef(["id", sChildId], bLiteral=True),
                 }
             )
         # endfor
@@ -413,7 +415,7 @@ class CLoopConfigs:
                 sDti = dicCfgMeta.get("sDTI")
                 iDataListIdx = dicCfgMeta.get("iDataListIdx")
                 iLevelIdx = dicCfgMeta["iLevelIdx"]
-                iLevelCnt = dicCfgMeta["iLevelCnt"]
+                # iLevelCnt = dicCfgMeta["iLevelCnt"]
                 lCfgData = dicData.get(sDti)
 
                 # Test whether data is in process cache
@@ -424,7 +426,7 @@ class CLoopConfigs:
                     xCfg = lCfgData[iDataListIdx]
                 # endif data in process cache
 
-                self._SetCfgVarsCurrentId(xCfgVars, sId)
+                self._SetCfgVarsCurrentId(xCML, sId)
                 if isinstance(xCfg, dict):
                     sImportPath = config.GetDictValue(
                         xCfg,
@@ -441,7 +443,7 @@ class CLoopConfigs:
                 # endif
 
                 try:
-                    dicCfg = xCfgVars.Process(xCfg, sImportPath=sImportPath, bPreProcessOnly=bPreProcessOnly)
+                    dicCfg = xCML.Process(xCfg, sImportPath=sImportPath, bPreProcessOnly=bPreProcessOnly)
                     lCfgData[iDataListIdx] = dicCfg
 
                     # Cache a copy of the processed config.
@@ -500,7 +502,7 @@ class CLoopConfigs:
 
         ######################################################################
         # Update dicVarData with processed configs
-        dicVarCfgId = xCfgVars.GetVarData().get("id")
+        dicVarCfgId = xCML.GetVarData().get("id")
         for sId, dicCfgMeta in dicCfgIdMeta.items():
             sDti = dicCfgMeta.get("sDTI")
             iDataListIdx = dicCfgMeta.get("iDataListIdx")
@@ -524,7 +526,7 @@ class CLoopConfigs:
         ######################################################################
         # Process and test all manifest and config filters
         for dicLevel in self.lScheme:
-            if self.IsFiltered(dicLevel, xCfgVars):
+            if self.IsFiltered(dicLevel, xCML):
                 return None
             # endif
         # endfor
@@ -545,7 +547,6 @@ class CLoopConfigs:
     #################################################################
     # Initialize loop
     def Init(self):
-
         if len(self.lScheme) == 0:
             self.iTotalCnt = 0
         else:
@@ -577,7 +578,6 @@ class CLoopConfigs:
     #################################################################
     # Step the loop
     def Next(self):
-
         bOK = True
         iLevelCnt = len(self.lScheme)
 

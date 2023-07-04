@@ -31,7 +31,15 @@ from . import configcml_func_std
 
 class CConfigCML(CAnyCML):
     def __init__(
-        self, *, xPrjCfg, dicConstVars={}, dicRefVars=None, sImportPath=None, dicRtVars=None, setRtVarsEval=None
+        self,
+        *,
+        xPrjCfg,
+        dicConstVars={},
+        dicRefVars=None,
+        sImportPath=None,
+        dicRtVars=None,
+        setRtVarsEval=None,
+        xParser: "CConfigCML" = None
     ):
         super().__init__(
             dicConstVars,
@@ -39,6 +47,7 @@ class CConfigCML(CAnyCML):
             sImportPath=sImportPath,
             dicRtVars=dicRtVars,
             setRtVarsEval=setRtVarsEval,
+            xParser=xParser,
         )
 
         configcml_func_std.SetProjectConfig(xPrjCfg)

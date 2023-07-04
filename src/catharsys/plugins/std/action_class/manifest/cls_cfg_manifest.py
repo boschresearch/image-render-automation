@@ -27,6 +27,7 @@
 # Class to handle manifest files
 import os
 import copy
+from typing import Optional
 from anybase.cls_any_error import CAnyError_Message
 from catharsys.util import config
 from catharsys.util.cls_configcml import CConfigCML
@@ -38,22 +39,22 @@ from catharsys.decs.decorator_log import logFunctionCall
 
 
 class CConfigManifest:
-    def __init__(self, *, xPrjCfg):
+    def __init__(self, *, xPrjCfg, _xCML: Optional[CConfigCML] = None):
         self.dicM = {}
         self.dicCfgGrps = {}
         self.xPrjCfg = xPrjCfg
+
+        self.xCML = CConfigCML(xPrjCfg=self.xPrjCfg, xParser=_xCML)
 
     # enddef
 
     ######################################################################################
     # Load Manifest from file
     def LoadFile(self, _xFilepath):
-
         pathFile = config.ProvideReadFilepathExt(_xFilepath)
         dicVars = self.xPrjCfg.GetFilepathVarDict(pathFile)
         self.dicM = config.Load(pathFile, sDTI="manifest:1.0", dicCustomVars=dicVars, bAddPathVars=True)
-        xCML = CConfigCML(xPrjCfg=self.xPrjCfg, sImportPath=pathFile.parent)
-        self.dicM = xCML.Process(self.dicM)
+        self.dicM = self.xCML.Process(self.dicM, sImportPath=pathFile.parent)
 
         self.dicCfgGrps = {}
 
@@ -69,7 +70,6 @@ class CConfigManifest:
     # Recursive function to construct config groups which may include other
     # config groups.
     def _ConstructConfigGroup(self, _sCfgGrp, _dicCfgGrps, _lCfgGrpIdList):
-
         if _sCfgGrp in _lCfgGrpIdList:
             raise Exception("Dependency loop detected at config group '{0}'.".format(_sCfgGrp))
         # endif
@@ -107,7 +107,6 @@ class CConfigManifest:
     ######################################################################################
     # Recursive function to construct config list from actions with dependencies
     def _ConstructConfigList(self, _sAction, _dicActions, _lActList):
-
         if _sAction in _lActList:
             raise Exception("Dependency loop detected at action '{0}'.".format(_sAction))
         # endif
@@ -161,10 +160,7 @@ class CConfigManifest:
     # enddef
 
     ######################################################################################
-    def _GetControlLoopIterCfg(
-        self, *, _iIdx: int, _dicIterCfg: dict, _dicCtrl: dict, _xCML: CConfigCML, _sImportPath: str
-    ) -> dict:
-
+    def _GetControlLoopIterCfg(self, *, _iIdx: int, _dicIterCfg: dict, _dicCtrl: dict, _sImportPath: str) -> dict:
         dicCtrlIter = {}
         if _dicIterCfg is not None:
             dicCtrlIter = copy.deepcopy(_dicIterCfg)
@@ -202,7 +198,7 @@ class CConfigManifest:
             dicCtrlIter["sId"] = str(_iIdx)
         else:
             # process 'sId' in case it contains functions/variables
-            lProcId = _xCML.Process(
+            lProcId = self.xCML.Process(
                 dicCtrlIter,
                 sImportPath=_sImportPath,
                 lProcessPaths=["sId"],
@@ -221,12 +217,11 @@ class CConfigManifest:
     # endif
 
     ######################################################################################
-    def _ProcessControlLoopRange(self, *, _dicCfgVars: dict, _pathCfgFile: Path, _dicCtrl: dict) -> list:
-
-        xCML = CConfigCML(xPrjCfg=self.xPrjCfg, dicConstVars=_dicCfgVars)
+    def _ProcessControlLoopRange(self, *, _pathCfgFile: Path, _dicCtrl: dict) -> list:
+        # xCML = CConfigCML(xPrjCfg=self.xPrjCfg, dicConstVars=_dicCfgVars)
 
         sImportPath = _pathCfgFile.as_posix()
-        lRange = xCML.Process(
+        lRange = self.xCML.Process(
             _dicCtrl,
             sImportPath=sImportPath,
             lProcessPaths=["iMin", "iMax", "iStep", "lActiveIndices"],
@@ -258,13 +253,12 @@ class CConfigManifest:
         lCtrlValues: list = []
 
         for iIdx in range(iMin, iMax + 1, iStep):
-
             if lActiveIndices is not None and iIdx not in lActiveIndices:
                 continue
             # endif
 
             dicCtrlIter = self._GetControlLoopIterCfg(
-                _iIdx=iIdx, _dicIterCfg=dicIterCfg, _dicCtrl=_dicCtrl, _xCML=xCML, _sImportPath=sImportPath
+                _iIdx=iIdx, _dicIterCfg=dicIterCfg, _dicCtrl=_dicCtrl, _sImportPath=sImportPath
             )
             dicCtrlIter["iMin"] = iMin
             dicCtrlIter["iMax"] = iMax
@@ -279,12 +273,11 @@ class CConfigManifest:
     # enddef
 
     ######################################################################################
-    def _ProcessControlLoopList(self, *, _dicCfgVars: dict, _pathCfgFile: Path, _dicCtrl: dict) -> list:
-
-        xCML = CConfigCML(xPrjCfg=self.xPrjCfg, dicConstVars=_dicCfgVars)
+    def _ProcessControlLoopList(self, *, _pathCfgFile: Path, _dicCtrl: dict) -> list:
+        # xCML = CConfigCML(xPrjCfg=self.xPrjCfg, dicConstVars=_dicCfgVars)
 
         sImportPath = _pathCfgFile.as_posix()
-        lRange = xCML.Process(
+        lRange = self.xCML.Process(
             _dicCtrl,
             sImportPath=sImportPath,
             lProcessPaths=["lIndices", "iMin", "iMax", "iStep"],
@@ -338,12 +331,11 @@ class CConfigManifest:
         lCtrlValues: list = []
 
         for iListIdx in range(iMin, iMax + 1, iStep):
-
             # The actual index to use
             iIdx: int = lIndices[iListIdx]
 
             dicCtrlIter = self._GetControlLoopIterCfg(
-                _iIdx=iIdx, _dicIterCfg=dicIterCfg, _dicCtrl=_dicCtrl, _xCML=xCML, _sImportPath=sImportPath
+                _iIdx=iIdx, _dicIterCfg=dicIterCfg, _dicCtrl=_dicCtrl, _sImportPath=sImportPath
             )
 
             # add iter config to value list
@@ -357,8 +349,7 @@ class CConfigManifest:
     ######################################################################################
     # Get list of configs from trial dictionary for given action
     @logFunctionCall
-    def GetTrialConfigs(self, _sAction, _dicTrial, *, dicCfgVars):
-
+    def GetTrialConfigs(self, _sAction, _dicTrial):  # , *, dicCfgVars):
         dicActions = self.dicM.get("mActions")
         if dicActions is None:
             raise Exception("Manifest does not contain any action definitions")
@@ -418,7 +409,6 @@ class CConfigManifest:
                     # sTrialPath = config.GetElementAtPath(_dicTrial, "__locals__/path")
 
                     for sFileCtrlCfg in lValues:
-
                         pathCfgFile = config.ProvideReadFilepathExt((sTrialPath, sFileCtrlCfg))
                         dicVars = self.xPrjCfg.GetFilepathVarDict(pathCfgFile)
                         dicCtrlLoad = config.Load(
@@ -442,17 +432,11 @@ class CConfigManifest:
 
                         if lCtrlType[0] == "loop" and lCtrlType[1] == "range" and lCtrlVer[0] == 1:
                             lCtrlValues.extend(
-                                self._ProcessControlLoopRange(
-                                    _dicCfgVars=dicCfgVars, _pathCfgFile=pathCfgFile, _dicCtrl=dicCtrl
-                                )
+                                self._ProcessControlLoopRange(_pathCfgFile=pathCfgFile, _dicCtrl=dicCtrl)
                             )
 
                         elif lCtrlType[0] == "loop" and lCtrlType[1] == "list" and lCtrlVer[0] == 1:
-                            lCtrlValues.extend(
-                                self._ProcessControlLoopList(
-                                    _dicCfgVars=dicCfgVars, _pathCfgFile=pathCfgFile, _dicCtrl=dicCtrl
-                                )
-                            )
+                            lCtrlValues.extend(self._ProcessControlLoopList(_pathCfgFile=pathCfgFile, _dicCtrl=dicCtrl))
 
                         else:
                             raise Exception(
