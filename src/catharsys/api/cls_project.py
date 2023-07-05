@@ -39,6 +39,7 @@ from .cls_action import CAction
 
 TWorkspace = ForwardRef("Workspace")
 
+
 #########################################################################
 class CProject:
     @property
@@ -65,9 +66,12 @@ class CProject:
     def xConfig(self) -> CProjectConfig:
         return self._xPrjCfg
 
+    @property
+    def xLaunch(self) -> CConfigLaunch:
+        return self._xLaunch
+
     #####################################################################
     def __init__(self, _xPrjCfg: CProjectConfig, *, xWorkspace: Optional[TWorkspace] = None):
-
         self._xWorkspace = xWorkspace
         self._xPrjCfg = _xPrjCfg
         self._xLaunch = CConfigLaunch()
@@ -87,7 +91,6 @@ class CProject:
 
     #####################################################################
     def PrintActions(self):
-
         print(f"Actions of project '{self.sId}':")
         for sAction in self._lActionPaths:
             print("  - '{}': {}".format(sAction, self.GetActionInfo(sAction)))
