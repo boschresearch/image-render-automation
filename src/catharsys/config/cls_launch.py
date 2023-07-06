@@ -57,11 +57,16 @@ class CConfigLaunch:
 
     # enddef
 
+    @property
+    def dicGlobalArgs(self) -> dict:
+        return self.dicLaunch.get("mGlobalArgs", {})
+
+    # enddef
+
     ######################################################################################
     def __init__(
         self, _dicData: Optional[dict] = None, _dicRtv: Optional[dict] = None, _setRtvEval: Optional[set] = None
     ):
-
         self._dicLaunch: dict = None
         self._dicRtv: dict = None
         self._setRtvEval: set = None
@@ -82,9 +87,14 @@ class CConfigLaunch:
     # enddef
 
     ######################################################################################
+    def __copy__(self) -> "CConfigLaunch":
+        return CConfigLaunch(self._dicLaunch, self._dicRtv, self._setRtvEval)
+
+    # enddef
+
+    ######################################################################################
     # Load Launch from file
     def LoadFile(self, _xPrjCfg):
-
         pathFile = _xPrjCfg.pathLaunchFile
         if pathFile is None:
             raise CAnyError_Message(sMsg="No launch file defined in project configuration")
@@ -114,7 +124,6 @@ class CConfigLaunch:
     ######################################################################################
     # Set launch argument from dictionary
     def SetLaunchArgs(self, _xPrjCfg, _dicArgs):
-
         dicCfg = config.AssertConfigType(_dicArgs, "launch:*")
         lVer = dicCfg.get("lCfgVer")
         if lVer[0] < 1 or lVer[0] > 2:
@@ -152,7 +161,6 @@ class CConfigLaunch:
     # together with the final action name.
     # if the given action name is not an alias, returns a copy of this instance.
     def ResolveActionAlias(self, _sActionAlias: str) -> Tuple[str, "CConfigLaunch"]:
-
         dicActionArgs = config.GetDictValue(self._dicLaunch, "mActions", dict, sWhere="launch arguments")
 
         # Available actions
@@ -217,7 +225,6 @@ class CConfigLaunch:
 
     ######################################################################################
     def GetResolvedActionData(self, _sAction):
-
         sAction, xLaunchCfg = self.ResolveActionAlias(_sAction)
         return xLaunchCfg.GetActionData(sAction)
 
@@ -225,7 +232,6 @@ class CConfigLaunch:
 
     ######################################################################################
     def GetActionInfo(self, _sAction):
-
         dicAction = self.GetResolvedActionData(_sAction)
         dicConfig = config.GetDictValue(dicAction, "mConfig", dict, sWhere=f"action '{_sAction}' arguments")
         return dicConfig.get("sInfo", "")
@@ -233,11 +239,39 @@ class CConfigLaunch:
     # enddef
 
     ######################################################################################
+    def GetActionConfig(self, _sAction) -> dict:
+        try:
+            dicActions = self.dicLaunch.get("mActions")
+            if dicActions is None:
+                raise CAnyError_Message(sMsg="Launch configuration does not contain element 'mActions'.")
+            # endif
+
+            dicAction: dict = config.GetDictValue(
+                dicActions,
+                _sAction,
+                dict,
+                bAllowKeyPath=True,
+                sWhere="launch configuration actions",
+            )
+
+            dicCfg = dicAction.get("mConfig")
+            if dicCfg is None:
+                dicCfg = dicAction["mConfig"] = {}
+            # endif
+
+        except Exception as xEx:
+            raise CAnyError_Message(sMsg="Error obtaining action data", xChildEx=xEx)
+        # endtry
+
+        return dicCfg
+
+    # enddef
+
+    ######################################################################################
     # Get dictionary of all execution files per action
     def GetActionData(self, _sAction, *, dicConfigOverride: Optional[dict] = None):
-
         try:
-            dicNewConfig = copy.deepcopy(self.dicLaunch.get("mGlobalArgs", {}))
+            dicNewConfig = copy.deepcopy(self.dicGlobalArgs)
             dicActions = self.dicLaunch.get("mActions")
             if dicActions is None:
                 raise CAnyError_Message(sMsg="Launch configuration does not contain element 'mActions'.")
@@ -278,7 +312,6 @@ class CConfigLaunch:
     ######################################################################################
     # Get dictionary of all execution files per action
     def GetActionDict(self, *, dicConfigOverride: Optional[dict] = None):
-
         try:
             dicAllAct = {}
             dicGlobalArgs = self.dicLaunch.get("mGlobalArgs", {})
@@ -325,6 +358,30 @@ class CConfigLaunch:
         # endtry
 
         return dicAllAct
+
+    # enddef
+
+    ######################################################################################
+    # Get dictionary of all execution files per action
+    def GetTrialActionDict(self, *, dicConfigOverride: Optional[dict] = None):
+        dicTrialAct = {}
+        dicActAll: dict = self.GetActionDict(dicConfigOverride=dicConfigOverride)
+        sActPath: str = None
+        for sActPath in dicActAll:
+            dicAct: dict = dicActAll[sActPath]
+            sTrialFile = dicAct["mConfig"].get("sTrialFile")
+            if sTrialFile is None:
+                continue
+            # endif
+
+            lTrialActs: list = dicTrialAct.get(sTrialFile)
+            if lTrialActs is None:
+                lTrialActs = dicTrialAct[sTrialFile] = []
+            # endif
+            lTrialActs.append(sActPath)
+        # endfor
+
+        return dicTrialAct
 
     # enddef
 
