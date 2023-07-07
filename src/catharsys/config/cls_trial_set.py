@@ -48,7 +48,7 @@ class CTrialSet:
         sGlobalTrialFile: str = self._xLaunch.dicGlobalArgs.get("sTrialFile")
 
         self._dicActionSet = {}
-        self._dicTrialActions = {}
+        self._dicTrialActionPaths = {}
 
         for sActionPath in self._lActionPaths:
             sBaseAction, xActLaunch = self._xLaunch.ResolveActionAlias(sActionPath)
@@ -61,9 +61,9 @@ class CTrialSet:
                 sActionPath=sActionPath, sBaseAction=sBaseAction, sTrialFile=sTrialFile, xLaunch=xActLaunch
             )
 
-            lTrialAction = self._dicTrialActions.get(sTrialFile)
+            lTrialAction = self._dicTrialActionPaths.get(sTrialFile)
             if lTrialAction is None:
-                lTrialAction = self._dicTrialActions[sTrialFile] = []
+                lTrialAction = self._dicTrialActionPaths[sTrialFile] = []
             # endif
             lTrialAction.append(sActionPath)
         # endfor
@@ -78,12 +78,17 @@ class CTrialSet:
 
     @property
     def lTrialFiles(self) -> list[str]:
-        return list(self._dicTrialActions.keys())
+        return list(self._dicTrialActionPaths.keys())
 
     # enddef
 
     def GetTrialActionPaths(self, _sTrial: str) -> list[str]:
-        return self._dicTrialActions.get(_sTrial)
+        return self._dicTrialActionPaths.get(_sTrial)
+
+    # enddef
+
+    def GetResolvedAction(self, _sActionPath: str) -> CResolvedAction:
+        return self._dicActionSet.get(_sActionPath)
 
     # enddef
 

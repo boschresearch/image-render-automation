@@ -362,7 +362,7 @@ class CConfigLaunch:
     # enddef
 
     ######################################################################################
-    # Get dictionary of all execution files per action
+    # Get dictionary of all actions per trial
     def GetTrialActionDict(self, *, dicConfigOverride: Optional[dict] = None):
         dicTrialAct = {}
         dicActAll: dict = self.GetActionDict(dicConfigOverride=dicConfigOverride)
