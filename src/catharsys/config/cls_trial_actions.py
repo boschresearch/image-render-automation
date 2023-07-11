@@ -43,7 +43,7 @@ class CResolvedAction:
 # This class enables handling of actions per trial.
 # In the launch file, actions are defined, and for each action a trial file is given.
 # This class scans all actions of a launch file and collects the actions per trial file.
-class CTrialSet:
+class CTrialActions:
     def __init__(self, _xLaunch: CConfigLaunch):
         self._xLaunch = copy.copy(_xLaunch)
 

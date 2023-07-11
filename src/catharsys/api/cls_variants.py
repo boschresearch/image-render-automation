@@ -21,11 +21,13 @@
 ###
 
 import re
+from typing import Optional
 from pathlib import Path
 from anybase import config
 
+from .cls_project import CProject
 from .cls_workspace import CWorkspace
-from .cls_variant_group import CVariantGroup
+from ..config.cls_variant_group import CVariantGroup
 
 
 # This class handles workspace variants.
@@ -45,7 +47,7 @@ from .cls_variant_group import CVariantGroup
 #   [...]
 #
 # All variants are stored in a workspace.
-# For each variant an appropriate instance of CWorkspace can be returned,
+# For each variant an appropriate instance of CProject can be returned,
 #   which contains the active name of the launch file for the current variant.
 #   The launch file variant contains the same trial file names of the currently
 #   active trial group variant.
@@ -55,23 +57,51 @@ class CVariants:
     c_sFileVariants = "variants.json"
     c_reFolderGrp = re.compile(r"g(?P<group>\d+)")
 
-    def __init__(self, _wsX: CWorkspace):
-        self._wsMain: CWorkspace = _wsX
-        self._dicVarCfg: dict = None
-        self._dicVarGrp: dict[str, CVariantGroup] = None
-        self._InitFromWorkspace()
+    def __init__(self, _prjX: CProject):
+        self._xProject: CProject = _prjX
+        self._dicGroupVariants: dict[str, CVariantGroup] = None
+
+        dicVarCfg: dict = None
+        if not self.pathVariantsConfig.exists():
+            dicVarCfg = {"sDTI": "/catharsys/variants:1.0", "mGroups": {}}
+            self.pathVariants.mkdir(parents=True, exist_ok=True)
+            config.Save(self.pathVariantsConfig, dicVarCfg)
+        else:
+            dicVarCfg = config.Load(self.pathVariantsConfig, sDTI="/catharsys/variants:1")
+            if "mGroups" not in dicVarCfg:
+                raise RuntimeError("Element 'mGroups' missing in variants config")
+            # endif
+        # endif
+
+        dicGroups: dict = dicVarCfg["mGroups"]
+        self._dicGroupVariants = {}
+        for sVarGrp in dicGroups:
+            xVarGrp = CVariantGroup(self.pathVariants)
+            xVarGrp.FromConfig(_prjX=self._xProject, _dicCfg=dicGroups[sVarGrp])
+            self._dicGroupVariants[sVarGrp] = xVarGrp
+        # endfor
+
+    # enddef
+
+    @property
+    def xWorkspace(self) -> CWorkspace:
+        return self._xProject.xWorkspace
 
     # enddef
 
     @property
     def pathWorkspace(self) -> Path:
-        return self._wsMain.pathWorkspace
+        return self.xWorkspace.pathWorkspace
 
     # enddef
 
     @property
+    def pathLaunch(self) -> Path:
+        return self._xProject.xConfig.pathLaunch
+
+    @property
     def pathVariants(self) -> Path:
-        return self.pathWorkspace / CVariants.c_sFolderVariants
+        return self.pathLaunch / CVariants.c_sFolderVariants
 
     # enddef
 
@@ -83,51 +113,19 @@ class CVariants:
 
     @property
     def lGroupNames(self) -> list[str]:
-        return list(self._dicVarCfg["mGroups"].keys())
-
-    # enddef
-
-    # ############################################################################################
-    def _InitFromWorkspace(self):
-        if not self.pathVariantsConfig.exists():
-            self._dicVarCfg = {"sDTI": "/catharsys/variants:1.0", "mGroups": {}}
-            self.pathVariants.mkdir(parents=True, exist_ok=True)
-            config.Save(self.pathVariantsConfig, self._dicVarCfg)
-        else:
-            self._dicVarCfg = config.Load(self.pathVariantsConfig, sDTI="/catharsys/variants:1")
-            if "mGroups" not in self._dicVarCfg:
-                raise RuntimeError("Element 'mGroups' missing in variants config")
-            # endif
-        # endif
-
-        dicGroups: dict = self._dicVarCfg["mGroups"]
-        self._dicVarGrp = {}
-        for sVarGrp in dicGroups:
-            self._dicVarGrp[sVarGrp] = CVariantGroup(self._wsMain, sVarGrp, dicGroups[sVarGrp])
-        # endfor
-
-        # dicFilesVarCfg = { "mGroups": {} }
-        # dicGroups: dict = dicFilesVarCfg["mGroups"]
-        # pathItem: Path = None
-        # for pathItem in self.pathVariants.iterdir():
-        #     if pathItem.is_dir():
-        #         xMatch = CVariants.c_reFolderGrp.fullmatch(pathItem.name)
-        #         if xMatch is not None:
-        #             iGrpId = int(xMatch.group("group"))
-        #             dicGrp: dict = dicGroups[iGrpId] = {}
-        # # endfor
+        return list(self._dicGroupVariants.keys())
 
     # enddef
 
     # ############################################################################################
     def HasGroup(self, _sGroup: str) -> bool:
-        return _sGroup in self._dicVarCfg["mGroups"]
+        return _sGroup in self._dicGroupVariants
 
     # enddef
 
     # ############################################################################################
     def GetGroup(self, _sGroup: str) -> CVariantGroup:
-        xGrp: CVariantGroup = self._dicVarGrp.get(_sGroup)
+        xGrp: CVariantGroup = self._dicGroupVariants.get(_sGroup)
         if not isinstance(xGrp, CVariantGroup):
             raise RuntimeError(f"Variant group '{_sGroup}' not available")
         # endif
@@ -141,7 +139,42 @@ class CVariants:
             raise RuntimeError(f"Variant group '{_sGroup}' already exists")
         # endif
 
-        self._dicVarGrp[_sGroup] = CVariantGroup(self._wsMain, _sGroup)
+        xVarGrp: CVariantGroup = CVariantGroup(self.pathVariants)
+        xVarGrp.Create(_prjX=self._xProject, _sGroup=_sGroup, _sInfo="n/a")
+
+        self._dicGroupVariants[_sGroup] = xVarGrp
+
     # enddef
+
+    # ############################################################################################
+    # Updates all groups from the source launch and trial files
+    def UpdateFromSource(self, *, _bOverwrite: Optional[bool] = False):
+        self._xProject.Update()
+        for sGroup in self._dicGroupVariants:
+            self._dicGroupVariants[sGroup].UpdateFromSource(_bOverwrite=_bOverwrite)
+        # endfor
+
+    # enddef
+
+    # ############################################################################################
+    def Serialize(self, *, _bWriteToDisk: bool = True) -> dict:
+        dicGroups = {}
+        for sGroup in self._dicGroupVariants:
+            dicGroups[sGroup] = self._dicGroupVariants[sGroup].Serialize()
+        # endfor
+
+        dicData = {
+            "sDTI": "/catharsys/variants:1.0",
+            "mGroups": dicGroups,
+        }
+
+        if _bWriteToDisk is True:
+            config.Save(self.pathVariantsConfig, dicData)
+        # endif
+
+        return dicData
+
+    # enddef
+
 
 # endclass
