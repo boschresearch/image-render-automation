@@ -33,7 +33,8 @@ from anybase import path as anypath
 from ..util.data import DictRecursiveUpdate
 
 from ..api.cls_project import CProject
-from ..api.cls_workspace import CWorkspace
+# from ..api.cls_workspace import CWorkspace
+# from ..config.cls_launch import CConfigLaunch
 from .cls_variant_trial import CVariantTrial
 
 
@@ -51,6 +52,12 @@ class CVariantLaunch:
 
         self._iNextTrialVarId: int = 1
         self._dicTrialVariants: dict[int, CVariantTrial] = None
+
+    # enddef
+
+    @property
+    def pathLaunchFile(self) -> Path:
+        return self._pathLaunchFile
 
     # enddef
 
@@ -79,10 +86,12 @@ class CVariantLaunch:
             raise RuntimeError("Element 'mTrialVariants' missing in launch variant configuration")
         # endif
 
-        for iTrialVarId in dicCfgTrialVariants:
+        sTrialVarId: str = None
+        for sTrialVarId in dicCfgTrialVariants:
+            iTrialVarId: int = int(sTrialVarId)
             xVarTrial = CVariantTrial()
             xVarTrial.FromConfig(
-                _prjX=self._xProject, _pathGroup=self._pathVariant, _dicCfg=dicCfgTrialVariants[iTrialVarId]
+                _prjX=self._xProject, _pathGroup=self._pathVariant, _dicCfg=dicCfgTrialVariants[sTrialVarId]
             )
             self._dicTrialVariants[iTrialVarId] = xVarTrial
         # endfor

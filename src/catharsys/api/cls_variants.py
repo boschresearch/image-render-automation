@@ -20,14 +20,18 @@
 # </LICENSE>
 ###
 
-import re
 from typing import Optional
 from pathlib import Path
 from anybase import config
+from anybase import path as anypath
 
 from .cls_project import CProject
 from .cls_workspace import CWorkspace
 from ..config.cls_variant_group import CVariantGroup
+from ..config.cls_variant_launch import CVariantLaunch
+from ..config.cls_variant_trial import CVariantTrial
+from ..config.cls_variant_instance import CVariantInstance
+from ..util import fsops
 
 
 # This class handles workspace variants.
@@ -53,21 +57,25 @@ from ..config.cls_variant_group import CVariantGroup
 #   active trial group variant.
 #
 class CVariants:
-    c_sFolderVariants = "variants"
+    c_sFolderVariants = ".variants"
+    c_sFolderInstances = "_instances"
     c_sFileVariants = "variants.json"
-    c_reFolderGrp = re.compile(r"g(?P<group>\d+)")
+    c_lConfigSuffix = [".json", ".json5", ".ison"]
+    # c_reFolderGrp = re.compile(r"g(?P<group>\d+)")
 
     def __init__(self, _prjX: CProject):
         self._xProject: CProject = _prjX
         self._dicGroupVariants: dict[str, CVariantGroup] = None
 
         dicVarCfg: dict = None
-        if not self.pathVariantsConfig.exists():
+        if not self.pathVariantsConfigFile.exists():
             dicVarCfg = {"sDTI": "/catharsys/variants:1.0", "mGroups": {}}
             self.pathVariants.mkdir(parents=True, exist_ok=True)
-            config.Save(self.pathVariantsConfig, dicVarCfg)
+            config.Save(self.pathVariantsConfigFile, dicVarCfg)
+            pathGitIgnore = self.pathVariants / ".gitignore"
+            pathGitIgnore.write_text(f"{CVariants.c_sFolderInstances}\n")
         else:
-            dicVarCfg = config.Load(self.pathVariantsConfig, sDTI="/catharsys/variants:1")
+            dicVarCfg = config.Load(self.pathVariantsConfigFile, sDTI="/catharsys/variants:1")
             if "mGroups" not in dicVarCfg:
                 raise RuntimeError("Element 'mGroups' missing in variants config")
             # endif
@@ -106,8 +114,14 @@ class CVariants:
     # enddef
 
     @property
-    def pathVariantsConfig(self) -> Path:
+    def pathVariantsConfigFile(self) -> Path:
         return self.pathVariants / CVariants.c_sFileVariants
+
+    # enddef
+
+    @property
+    def pathInstances(self) -> Path:
+        return self.pathVariants / CVariants.c_sFolderInstances
 
     # enddef
 
@@ -124,10 +138,13 @@ class CVariants:
     # enddef
 
     # ############################################################################################
-    def GetGroup(self, _sGroup: str) -> CVariantGroup:
+    def GetGroup(self, _sGroup: str, *, _bDoRaise: bool = True) -> CVariantGroup:
         xGrp: CVariantGroup = self._dicGroupVariants.get(_sGroup)
         if not isinstance(xGrp, CVariantGroup):
-            raise RuntimeError(f"Variant group '{_sGroup}' not available")
+            if _bDoRaise is True:
+                raise RuntimeError(f"Variant group '{_sGroup}' not available")
+            # endif
+            return None
         # endif
         return xGrp
 
@@ -169,10 +186,118 @@ class CVariants:
         }
 
         if _bWriteToDisk is True:
-            config.Save(self.pathVariantsConfig, dicData)
+            config.Save(self.pathVariantsConfigFile, dicData)
         # endif
 
         return dicData
+
+    # enddef
+
+    # ############################################################################################
+    # def GetInstances(self) -> list[CVariantInstance]:
+    #     pathInstances = self.pathInstances
+    #     pathInstances.mkdir(parents=True, exist_ok=True)
+
+    #     for pathInst in pathInstances.iterdir():
+    #         if not pathInst.is_dir():
+    #             continue
+    #         # endif
+    #         xMatch = CVariants.c_reFolderInst.fullmatch(pathInst.name)
+    #         if xMatch is None:
+    #             continue
+    #         # endif
+
+    #     sInstFolder: str = f"{_sGroup}-{_iLaunchId}-{_iTrialId}"
+
+    # ############################################################################################
+    def CreateInstance(self, *, _sGroup: str, _iLaunchId: int, _iTrialId: int) -> CVariantInstance:
+        xGroup: CVariantGroup = self.GetGroup(_sGroup)
+        xLaunch: CVariantLaunch = xGroup.GetLaunchVariant(_iLaunchId)
+        xTrial: CVariantTrial = xLaunch.GetTrialVariant(_iTrialId)
+
+        xInst = CVariantInstance(_pathInstances=self.pathInstances)
+        xInst.Create(_sGroup=_sGroup, _iLaunchId=_iLaunchId, _iTrialId=_iTrialId)
+
+        lReExcludeDirs: list[str] = [r"^\..+"]
+        lReExcludeFiles: list[str] = [r".+\.ipynb$"]
+
+        # Copy source configurations
+        fsops.CopyFilesInDir(
+            self.pathLaunch, xInst.pathInstance, lReExcludeDirs=lReExcludeDirs, lReExcludeFiles=lReExcludeFiles
+        )
+
+        # Check whether launch file exists with one of the possible extensions
+        pathTrgFile = anypath.ProvideReadFilepathExt(
+            xInst.pathInstance / xLaunch.pathLaunchFile.stem, CVariants.c_lConfigSuffix, bDoRaise=False
+        )
+        if pathTrgFile is not None:
+            pathTrgFile.unlink()
+        # endif
+
+        # Copy Variant launch file
+        fsops.CopyFileToDir(xLaunch.pathLaunchFile, xInst.pathInstance)
+
+        # Copy variant trial files
+        lSrcTrgPaths = xTrial.CreateVariantSourceTargetPaths(xInst.pathInstance)
+        sTrialBaseId = f"{self._xProject.xConfig.sLaunchFolderName}/{xInst.sName}"
+        pathSrc: Path = None
+        pathTrg: Path = None
+        bIsConfigFile: bool = False
+        for pathSrc, pathTrg in lSrcTrgPaths:
+            # Remove target files if the exist under the same name but with possibly different configuration suffix
+            if pathTrg.suffix in CVariants.c_lConfigSuffix:
+                bIsConfigFile = True
+                pathTest = pathTrg.parent / pathTrg.stem
+                pathTest = anypath.ProvideReadFilepathExt(pathTest, CVariants.c_lConfigSuffix, bDoRaise=False)
+                if pathTest is not None:
+                    pathTest.unlink()
+                # endif
+            else:
+                bIsConfigFile = False
+            # endif
+            fsops.CopyFile(pathSrc, pathTrg)
+
+            # Adapt the trial ids
+            if bIsConfigFile is True:
+                dicCfg = config.Load(pathTrg, bReplacePureVars=False)
+                if config.IsConfigType(dicCfg, "/catharsys/trial:*"):
+                    bChanged: bool = False
+                    sId: str = dicCfg.get("sId", "")
+                    if "${rel-path-config}" in sId:
+                        sId = sId.replace("${rel-path-config}", sTrialBaseId)
+                        bChanged = True
+                    # endif
+
+                    if "${filebasename}" in sId or "$filebasename" in sId:
+                        sFilebasename = f"{sTrialBaseId}/{pathTrg.stem}"
+                        sId = sId.replace("${filebasename}", sFilebasename)
+                        sId = sId.replace("$filebasename", sFilebasename)
+                        bChanged = True
+                    # endif
+
+                    if bChanged is False:
+                        sId = f"{sTrialBaseId}/{sId}"
+                    # endif
+
+                    dicCfg["sId"] = sId
+                    config.Save(pathTrg, dicCfg)
+                # endif
+            # endif
+        # endfor
+
+        return xInst
+
+    # enddef
+
+    # ############################################################################################
+    def RemoveAllInstances(self):
+        fsops.RemoveTree(self.pathInstances, bIgnoreErrors=True)
+
+    # enddef
+
+    # ############################################################################################
+    def RemoveInstance(self, _xInstance: CVariantInstance, *, _bIgnoreErrors: bool = False):
+        fsops.RemoveTree(_xInstance.pathInstance, bIgnoreErrors=_bIgnoreErrors)
 
     # enddef
 

@@ -126,7 +126,7 @@ class CVariantTrial:
     # enddef
 
     # ############################################################################################
-    def GetConfigVariantAbsPath(self, _sRelPathFile: str) -> Path:
+    def GetVariantAbsPath(self, _sRelPathFile: str) -> Path:
         return self._pathVariant / _sRelPathFile
 
     # enddef
@@ -144,6 +144,20 @@ class CVariantTrial:
         pathRelFile = Path(_sRelPathFile)
         pathSrc: Path = self._xProject.xConfig.pathLaunch / pathRelFile.parent / f"{pathRelFile.stem}"
         return anypath.ProvideReadFilepathExt(pathSrc, [".json", ".json5", ".ison"], bDoRaise=False)
+
+    # enddef
+
+    # ############################################################################################
+    def CreateVariantSourceTargetPaths(self, _pathTrg: Path) -> list[tuple[Path, Path]]:
+        lPathMap: list[tuple[Path, Path]] = []
+
+        for sRelPathFile in self._lRelPathFiles:
+            pathSrcFile = self.GetVariantAbsPath(sRelPathFile)
+            pathTrgFile = _pathTrg / sRelPathFile
+            lPathMap.append((pathSrcFile, pathTrgFile))
+        # endfor
+
+        return lPathMap
 
     # enddef
 
@@ -168,7 +182,7 @@ class CVariantTrial:
 
         sRelPathFile: str = None
         for iIdx, sRelPathFile in enumerate(self._lRelPathFiles):
-            pathVar = self.GetConfigVariantAbsPath(sRelPathFile)
+            pathVar = self.GetVariantAbsPath(sRelPathFile)
             pathSrc = self.GetConfigSourceAbsPath(sRelPathFile)
             if not pathVar.exists() or not pathSrc.exists():
                 lRemoveFiles.append(iIdx)
@@ -186,7 +200,7 @@ class CVariantTrial:
 
         for iIdx in lRemoveFiles:
             sRelPathFile = self._lRelPathFiles[iIdx]
-            pathVar = self.GetConfigVariantAbsPath(sRelPathFile)
+            pathVar = self.GetVariantAbsPath(sRelPathFile)
             pathVar.unlink(missing_ok=True)
             del self._lRelPathFiles[iIdx]
         # endfor

@@ -28,6 +28,7 @@
 from .cls_workspace import CWorkspace
 from .cls_project import CProject
 from .cls_action import CAction
+from .cls_variants import CVariants
 
 from .cls_result_data import CResultData
 from .cls_action_result_data import CActionResultData

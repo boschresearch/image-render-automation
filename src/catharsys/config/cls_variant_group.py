@@ -74,6 +74,12 @@ class CVariantGroup:
 
     # enddef
 
+    @property
+    def lLaunchVariantIds(self) -> list[int]:
+        return list(self._dicLaunchVariants.keys())
+
+    # enddef
+
     # ############################################################################################
     def FromConfig(self, *, _prjX: CProject, _dicCfg: dict):
         _sGroup: str = _dicCfg.get("sName")
@@ -98,10 +104,12 @@ class CVariantGroup:
             raise RuntimeError("Element 'mLaunchVariants' missing in variants group configuration")
         # endif
 
-        for iLaunchVarId in dicCfgLaunchVars:
+        sLaunchVarId: str = None
+        for sLaunchVarId in dicCfgLaunchVars:
+            iLaunchVarId: int = int(sLaunchVarId)
             xVarLaunch = CVariantLaunch()
             xVarLaunch.FromConfig(
-                _pathGroup=self._pathGroup, _prjX=self._xProject, _dicCfg=dicCfgLaunchVars[iLaunchVarId]
+                _pathGroup=self._pathGroup, _prjX=self._xProject, _dicCfg=dicCfgLaunchVars[sLaunchVarId]
             )
             self._dicLaunchVariants[iLaunchVarId] = xVarLaunch
         # endfor
