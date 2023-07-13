@@ -35,6 +35,7 @@ from ..util.data import DictRecursiveUpdate
 from ..api.cls_project import CProject
 from ..api.cls_workspace import CWorkspace
 from .cls_trial_actions import CTrialActions
+from .cls_launch import CConfigLaunch
 
 
 # #####################################################################################
@@ -51,8 +52,14 @@ class CVariantTrial:
 
     # enddef
 
+    @property
+    def xTrialActions(self) -> CTrialActions:
+        return self._xTrialAct
+
+    # enddef
+
     # ############################################################################################
-    def FromConfig(self, *, _pathGroup: Path, _prjX: CProject, _dicCfg: dict):
+    def FromConfig(self, *, _pathGroup: Path, _prjX: CProject, _xLaunch: CConfigLaunch, _dicCfg: dict):
         self._iId = convert.DictElementToInt(_dicCfg, "iId")
 
         pathVariant: Path = _pathGroup / f"tv-{self._iId}"
@@ -64,7 +71,7 @@ class CVariantTrial:
         self._pathVariant = pathVariant
         self._pathGroup = _pathGroup
         self._xProject = _prjX
-        self._xTrialAct = CTrialActions(_prjX.xLaunch)
+        self._xTrialAct = CTrialActions(_xLaunch)
 
         self._sInfo = convert.DictElementToString(_dicCfg, "sInfo", sDefault="")
         self._lRelPathFiles = convert.DictElementToStringList(_dicCfg, "lRelPathFiles")
@@ -79,7 +86,7 @@ class CVariantTrial:
     # enddef
 
     # ############################################################################################
-    def Create(self, *, _iId: int, _sInfo: str, _pathGroup: Path, _prjX: CProject):
+    def Create(self, *, _iId: int, _sInfo: str, _pathGroup: Path, _prjX: CProject, _xLaunch: CConfigLaunch):
         pathVariant: Path = _pathGroup / f"tv-{_iId}"
         if pathVariant.exists():
             raise RuntimeError(f"Trial variant path already exists: {(pathVariant.as_posix())}")
@@ -91,7 +98,7 @@ class CVariantTrial:
         self._sInfo = _sInfo
         self._pathGroup = _pathGroup
         self._xProject = _prjX
-        self._xTrialAct = CTrialActions(_prjX.xLaunch)
+        self._xTrialAct = CTrialActions(_xLaunch)
 
         self._lRelPathFiles = []
 

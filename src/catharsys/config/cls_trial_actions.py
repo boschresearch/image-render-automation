@@ -48,7 +48,39 @@ class CTrialActions:
         self._xLaunch = copy.copy(_xLaunch)
 
         self._lActionPaths = self._xLaunch.GetActionPaths()
+        self._UpdateResolvedActions()
 
+    # enddef
+
+    @property
+    def dicLaunch(self) -> dict:
+        return self._xLaunch.dicLaunch
+    # enddef
+    
+    @property
+    def dicGlobalArgs(self) -> dict:
+        return self._xLaunch.dicGlobalArgs
+
+    # enddef
+
+    @property
+    def lTrialFiles(self) -> list[str]:
+        return list(self._dicTrialActionPaths.keys())
+
+    # enddef
+
+    def GetTrialActionPaths(self, _sTrial: str) -> list[str]:
+        return self._dicTrialActionPaths.get(_sTrial)
+
+    # enddef
+
+    def GetResolvedAction(self, _sActionPath: str) -> CResolvedAction:
+        return self._dicActionSet.get(_sActionPath)
+
+    # enddef
+
+    # #####################################################################################################
+    def _UpdateResolvedActions(self):
         sGlobalTrialFile: str = self._xLaunch.dicGlobalArgs.get("sTrialFile")
 
         self._dicActionSet = {}
@@ -74,25 +106,14 @@ class CTrialActions:
 
     # enddef
 
-    @property
-    def dicGlobalArgs(self) -> dict:
-        return self._xLaunch.dicGlobalArgs
-
-    # enddef
-
-    @property
-    def lTrialFiles(self) -> list[str]:
-        return list(self._dicTrialActionPaths.keys())
-
-    # enddef
-
-    def GetTrialActionPaths(self, _sTrial: str) -> list[str]:
-        return self._dicTrialActionPaths.get(_sTrial)
-
-    # enddef
-
-    def GetResolvedAction(self, _sActionPath: str) -> CResolvedAction:
-        return self._dicActionSet.get(_sActionPath)
+    # #####################################################################################################
+    def ApplyResolvedActions(self):
+        sActPath: str = None
+        for sActPath in self._dicActionSet:
+            xResAct: CResolvedAction = self._dicActionSet[sActPath]
+            dicResCfg: dict = xResAct.xLaunch.GetActionConfig(xResAct.sBaseAction)
+            self._xLaunch.SetActionConfig(sActPath, dicResCfg)
+        # endfor
 
     # enddef
 

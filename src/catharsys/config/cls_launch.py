@@ -31,6 +31,7 @@ from typing import Tuple, Optional
 from anybase.cls_any_error import CAnyError_Message
 from catharsys.util import config
 from catharsys.util.cls_configcml import CConfigCML
+from ..util.data import DictRecursiveUpdate
 import ison
 
 
@@ -59,7 +60,11 @@ class CConfigLaunch:
 
     @property
     def dicGlobalArgs(self) -> dict:
-        return self.dicLaunch.get("mGlobalArgs", {})
+        dicGlobArgs = self.dicLaunch.get("mGlobalArgs")
+        if dicGlobArgs is None:
+            dicGlobArgs = self.dicLaunch["mGlobalArgs"] = {}
+        # endif
+        return dicGlobArgs
 
     # enddef
 
@@ -264,6 +269,39 @@ class CConfigLaunch:
         # endtry
 
         return dicCfg
+
+    # enddef
+
+    ######################################################################################
+    def SetActionConfig(self, _sAction: str, _dicCfg: dict, *, _bReplace: bool = True):
+        try:
+            dicActions = self.dicLaunch.get("mActions")
+            if dicActions is None:
+                raise CAnyError_Message(sMsg="Launch configuration does not contain element 'mActions'.")
+            # endif
+
+            dicAction: dict = config.GetDictValue(
+                dicActions,
+                _sAction,
+                dict,
+                bAllowKeyPath=True,
+                sWhere="launch configuration actions",
+            )
+
+            if _bReplace is True:
+                dicAction["mConfig"] = copy.deepcopy(_dicCfg)
+            else:
+                dicCfg = dicAction.get("mConfig")
+                if dicCfg is None:
+                    dicAction["mConfig"] = copy.deepcopy(_dicCfg)
+                else:
+                    DictRecursiveUpdate(dicAction["mConfig"], _dicCfg, _bRemoveTrgKeysNotInSrc=False)
+                # endif
+            # endif
+
+        except Exception as xEx:
+            raise CAnyError_Message(sMsg="Error obtaining action data", xChildEx=xEx)
+        # endtry
 
     # enddef
 

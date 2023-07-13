@@ -33,9 +33,11 @@ from anybase import path as anypath
 from ..util.data import DictRecursiveUpdate
 
 from ..api.cls_project import CProject
+
 # from ..api.cls_workspace import CWorkspace
 # from ..config.cls_launch import CConfigLaunch
 from .cls_variant_trial import CVariantTrial
+from .cls_launch import CConfigLaunch
 
 
 # #####################################################################################
@@ -46,6 +48,7 @@ class CVariantLaunch:
 
         self._xProject: CProject = None
         self._pathLaunchFile: Path = None
+        self._xLaunch: CConfigLaunch = None
 
         self._iId: int = None
         self._sInfo: str = None
@@ -58,6 +61,18 @@ class CVariantLaunch:
     @property
     def pathLaunchFile(self) -> Path:
         return self._pathLaunchFile
+
+    # enddef
+
+    @property
+    def xLaunch(self) -> CConfigLaunch:
+        return self._xLaunch
+
+    # enddef
+
+    @property
+    def lTrialVariantIds(self) -> list[int]:
+        return list(self._dicTrialVariants.keys())
 
     # enddef
 
@@ -80,6 +95,8 @@ class CVariantLaunch:
         sLaunchFilename = convert.DictElementToString(_dicCfg, "sLaunchFilename")
         self._pathLaunchFile = self._pathVariant / sLaunchFilename
 
+        self._xLaunch = CConfigLaunch(config.Load(self._pathLaunchFile, bReplacePureVars=False))
+
         self._dicTrialVariants = {}
         dicCfgTrialVariants: dict = _dicCfg.get("mTrialVariants")
         if not isinstance(dicCfgTrialVariants, dict):
@@ -91,7 +108,7 @@ class CVariantLaunch:
             iTrialVarId: int = int(sTrialVarId)
             xVarTrial = CVariantTrial()
             xVarTrial.FromConfig(
-                _prjX=self._xProject, _pathGroup=self._pathVariant, _dicCfg=dicCfgTrialVariants[sTrialVarId]
+                _prjX=self._xProject, _pathGroup=self._pathVariant, _xLaunch=self._xLaunch, _dicCfg=dicCfgTrialVariants[sTrialVarId]
             )
             self._dicTrialVariants[iTrialVarId] = xVarTrial
         # endfor
@@ -118,6 +135,7 @@ class CVariantLaunch:
         # Load launch file and save as standard json
         dicLaunch = config.Load(pathSrcLaunchFile, sDTI="/catharsys/launch:*", bReplacePureVars=False)
         config.Save(self._pathLaunchFile, dicLaunch)
+        self._xLaunch = CConfigLaunch(dicLaunch)
 
         # shutil.copyfile(pathSrcLaunchFile.as_posix(), self._pathLaunchFile.as_posix())
 
@@ -129,7 +147,7 @@ class CVariantLaunch:
     def AddTrialVariant(self, *, _sInfo: str = "") -> int:
         iId = self._iNextTrialVarId
         xVarTrial = CVariantTrial()
-        xVarTrial.Create(_iId=iId, _sInfo=_sInfo, _pathGroup=self._pathVariant, _prjX=self._xProject)
+        xVarTrial.Create(_iId=iId, _sInfo=_sInfo, _pathGroup=self._pathVariant, _prjX=self._xProject, _xLaunch=self._xLaunch)
         self._dicTrialVariants[iId] = xVarTrial
         self._iNextTrialVarId += 1
 
