@@ -94,7 +94,6 @@ class CWorkspace:
         xWorkspace: Union[Path, str, list, tuple, None] = None,
         sFileBasenameLaunch: Optional[str] = None,
     ):
-
         self._pathStart: Path = None
         self._pathWS: Path = None
         self._pathWsPkgFile: Path = None
@@ -124,15 +123,11 @@ class CWorkspace:
         self._pathWsPkgFile = self._FindWorkspaceFromPath(self._pathStart)
         if self._pathWsPkgFile is None:
             raise RuntimeError(
-                "Cannot find valid Catharsys workspace starting from path: {}".format(
-                    self._pathStart.as_posix()
-                )
+                "Cannot find valid Catharsys workspace starting from path: {}".format(self._pathStart.as_posix())
             )
         # endif
 
-        self._dicPkg = anycfg.Load(
-            self._pathWsPkgFile, sDTI="/package/catharsys/workspace:3"
-        )
+        self._dicPkg = anycfg.Load(self._pathWsPkgFile, sDTI="/package/catharsys/workspace:3")
         lCathVer = cathversion.AsIntList()
         self._sCathVersion = cathversion.AsString()
 
@@ -188,28 +183,17 @@ class CWorkspace:
     def PrintInfo(self) -> None:
         print("Workspace: {}, version {}".format(self._sPkgName, self._sPkgVersion))
         print("Path: {}".format(self._pathWS.as_posix()))
-        print(
-            "Package: {}".format(
-                self._pathWsPkgFile.relative_to(self._pathWS).as_posix()
-            )
-        )
-        print(
-            "Catharsys Version: Environment v{}, Required v{}".format(
-                self._sCathVersion, self._sPkgCathVersion
-            )
-        )
+        print("Package: {}".format(self._pathWsPkgFile.relative_to(self._pathWS).as_posix()))
+        print("Catharsys Version: Environment v{}, Required v{}".format(self._sCathVersion, self._sPkgCathVersion))
         print("Configurations:")
         for sPrjCfgId in self._dicProjects:
-            print(
-                "    - '{}': {}".format(sPrjCfgId, self._dicProjects[sPrjCfgId].sInfo)
-            )
+            print("    - '{}': {}".format(sPrjCfgId, self._dicProjects[sPrjCfgId].sInfo))
         # endfor
 
     # enddef
 
     #############################################################################
     def Project(self, _sPrjId: str) -> CProject:
-
         if _sPrjId not in self._dicProjects:
             raise RuntimeError(f"Project '{_sPrjId}' not available in workspace")
         # endif
@@ -220,18 +204,13 @@ class CWorkspace:
 
     #############################################################################
     def _FindWorkspaceFromPath(self, pathStart: Path) -> Path:
-
         pathPkg = None
         pathTest = pathStart
         while True:
             pathPkg = pathTest / "package"
-            pathPkg = anypath.ProvideReadFilepathExt(
-                pathPkg, [".json", ".json5", ".ison"]
-            )
+            pathPkg = anypath.ProvideReadFilepathExt(pathPkg, [".json", ".json5", ".ison"])
             if pathPkg is not None:
-                dicRes = anycfg.Load(
-                    pathPkg, sDTI="/package/catharsys/workspace:3", bDoThrow=False
-                )
+                dicRes = anycfg.Load(pathPkg, sDTI="/package/catharsys/workspace:3", bDoThrow=False)
                 if dicRes["bOK"] is True:
                     break
                 # endif
@@ -249,16 +228,11 @@ class CWorkspace:
 
     #############################################################################
     def _InitConfigs(self) -> None:
-
         lProjects: list[CProject] = []
 
         pathConfig = self._pathWS / "config"
         if not pathConfig.exists():
-            raise RuntimeError(
-                "Configuration folder 'config' not found in workspace: {}".format(
-                    pathConfig.as_posix()
-                )
-            )
+            raise RuntimeError("Configuration folder 'config' not found in workspace: {}".format(pathConfig.as_posix()))
         # endif
         self._pathConfig = pathConfig
 
@@ -267,12 +241,20 @@ class CWorkspace:
         lLaunchFiles = [
             x
             for x in pathConfig.rglob(f"{self._sFileBasenameLaunch}.*")
-            if (
-                x.is_file()
-                and ".vscode" not in x.as_posix()
-                and x.suffix in [".json", ".json5", ".ison"]
-            )
+            if (x.is_file() and ".vscode" not in x.as_posix() and x.suffix in [".json", ".json5", ".ison"])
         ]
+
+        lInvalidFiles = []
+        # print(lLaunchFiles)
+        for pathFile in lLaunchFiles:
+            if any((x != pathFile and pathFile.parent.is_relative_to(x.parent) for x in lLaunchFiles)):
+                lInvalidFiles.append(pathFile)
+            # endif
+        # endfor
+        # print(lInvalidFiles)
+        for pathFile in lInvalidFiles:
+            lLaunchFiles.remove(pathFile)
+        # endfor
 
         # Get list of valid project configurations in workspace
         for pathLaunchFile in lLaunchFiles:
