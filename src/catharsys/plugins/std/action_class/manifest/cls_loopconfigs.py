@@ -335,16 +335,6 @@ class CLoopConfigs:
         ####################################################
         # Create variables for replacement in config files.
         dicVars["trial-id"] = self.sId
-        dicVars["rel-path-trg"] = sRelPathTrgMain
-        dicVars["path-trg"] = os.path.join(self.xPrjCfg.pathActProd, sRelPathTrgMain)
-
-        ###################################
-        # Create variables for key 'action'
-        dicVarAct = {}
-        for sAct in lAct:
-            dicVarAct[sAct] = {"rel-path-trg": dicRelPathTrgAct.get(sAct)}
-        # endfor
-        dicVars["actions"] = dicVarAct
 
         ###################################
         # Variables for the 'id' key:
@@ -406,8 +396,28 @@ class CLoopConfigs:
         # dTimeStart = timer()
 
         # Pre-process all configs first and then parse them normally.
-        for iProcPass in range(2):
+        for iProcPass in range(3):
             bPreProcessOnly = iProcPass == 0
+
+            if iProcPass == 2:
+                ######################################################################
+                # Define variables that should not be stored in cached configs,
+                # as they will vary with all loop levels. Therefore, a config
+                # at a lower level depends on the loop index of a higher level.
+                dicVars["rel-path-trg"] = sRelPathTrgMain
+                dicVars["path-trg"] = path.MakeNormPath((self.xPrjCfg.pathActProd, sRelPathTrgMain)).as_posix()
+
+                ###################################
+                # Create variables for key 'action'
+                dicVarAct = {}
+                for sAct in lAct:
+                    dicVarAct[sAct] = {"rel-path-trg": dicRelPathTrgAct.get(sAct)}
+                # endfor
+                dicVars["actions"] = dicVarAct
+
+                ###################################
+                xCML.UpdateConstVars(dicVars, _bAllowOverwrite=True)
+            # endif
 
             # for sId, dicCfgMeta in dicCfgIdMeta.items():
             for sId in lIds:
@@ -420,7 +430,8 @@ class CLoopConfigs:
 
                 # Test whether data is in process cache
                 sProcCfgCacheHash = self._GetProcCfgCacheHash(sId, iLevelIdx, iDataListIdx)
-                if bPreProcessOnly is True and sProcCfgCacheHash in self.dicProcCfgCache:
+                # Load from cache only in process pass 0
+                if iProcPass == 0 and sProcCfgCacheHash in self.dicProcCfgCache:
                     xCfg = copy.deepcopy(self.dicProcCfgCache[sProcCfgCacheHash])
                 else:
                     xCfg = lCfgData[iDataListIdx]
@@ -446,8 +457,8 @@ class CLoopConfigs:
                     dicCfg = xCML.Process(xCfg, sImportPath=sImportPath, bPreProcessOnly=bPreProcessOnly)
                     lCfgData[iDataListIdx] = dicCfg
 
-                    # Cache a copy of the processed config.
-                    if bPreProcessOnly is False:
+                    # Cache a copy of the processed config in process pass 1.
+                    if iProcPass == 1:
                         if sProcCfgCacheHash not in self.dicProcCfgCache:
                             self.dicProcCfgCache[sProcCfgCacheHash] = copy.deepcopy(dicCfg)
                         # endif
