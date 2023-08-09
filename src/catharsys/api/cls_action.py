@@ -33,6 +33,7 @@ from pathlib import Path
 import ison
 from anybase import file as anyfile
 from catharsys.action.cls_actionfactory import CActionFactory
+from catharsys.action.cls_actionclass_executor import CActionClassExecutor
 from catharsys.config.cls_job import CConfigJob
 from catharsys.config.cls_project import CProjectConfig
 
@@ -50,20 +51,13 @@ class CAction:
         return self._xProject
 
     ####################################################################################
-    def __init__(
-        self,
-        _sAction: str,
-        _xProject: TProject,
-        *,
-        dicConfigOverride: Optional[dict] = None
-    ):
-
+    def __init__(self, _sAction: str, _xProject: TProject, *, dicConfigOverride: Optional[dict] = None):
         self._sAction: str = None
         self._dicConfigOverride: dict = None
         self._xActFact: CActionFactory = None
         self._xProject: TProject = None
         self._xPrjCfg: CProjectConfig = None
-        self._xAction = None
+        self._xAction: CActionClassExecutor = None
 
         self._sAction = _sAction
         self._dicConfigOverride = copy.deepcopy(dicConfigOverride)
@@ -71,16 +65,13 @@ class CAction:
         self._xPrjCfg = self._xProject.xConfig
 
         self._xActFact = CActionFactory(xPrjCfg=self._xPrjCfg)
-        self._xAction = self._xActFact.CreateAction(
-            sAction=self._sAction, dicConfigOverride=self._dicConfigOverride
-        )
+        self._xAction = self._xActFact.CreateAction(sAction=self._sAction, dicConfigOverride=self._dicConfigOverride)
         self._xAction.Init()
 
     # enddef
 
     ####################################################################################
     def Launch(self, bPrintOutput=False) -> CConfigJob:
-
         if self._xAction is None:
             raise Exception("No action created")
         # endif
@@ -104,11 +95,7 @@ class CAction:
             if not bPrintOutput:
                 sys.stdout.close()
                 sys.stdout = xOrigStdOut
-                print(
-                    "Action output written to: (use CTRL+LMB to open)\n{0}".format(
-                        pathStdOutFile.as_posix()
-                    )
-                )
+                print("Action output written to: (use CTRL+LMB to open)\n{0}".format(pathStdOutFile.as_posix()))
             # endif
         # endexcept
 
@@ -118,7 +105,6 @@ class CAction:
 
     ##########################################################################
     def GetJobConfig(self) -> CConfigJob:
-
         if self._xAction is None:
             raise Exception("No action created")
         # endif

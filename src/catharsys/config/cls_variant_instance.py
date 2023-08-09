@@ -24,6 +24,8 @@ import re
 import uuid
 from typing import Optional
 from pathlib import Path
+from catharsys.api.cls_project import CProject
+from catharsys.config.cls_project import CProjectConfig
 
 
 class CVariantInstance:
@@ -126,6 +128,21 @@ class CVariantInstance:
         self._pathInst = self._pathMain / self.sInstanceFolderName
 
         self._pathInst.mkdir(parents=True, exist_ok=True)
+
+    # enddef
+
+    # ############################################################################################
+    def GetProjectConfig(self) -> CProjectConfig:
+        xPrjCfg = CProjectConfig()
+        xPrjCfg.FromLaunchPath(self._pathInst)
+
+        return xPrjCfg
+
+    # enddef
+
+    # ############################################################################################
+    def GetProject(self) -> CProject:
+        return CProject(self.GetProjectConfig())
 
     # enddef
 
