@@ -41,6 +41,7 @@ from ison.core.cls_parser_error import CParserError
 
 from anybase.cls_any_error import CAnyError_Message, CAnyError_TaskMessage
 from anybase import convert
+from anybase.cls_process_handler import CProcessHandler
 
 from catharsys.util import config
 from catharsys.util import path
@@ -56,9 +57,10 @@ from catharsys.plugins.std.action_class.manifest import utils
 
 from catharsys.config.cls_project import CProjectConfig
 from catharsys.config.cls_launch import CConfigLaunch
+from catharsys.config.cls_exec_job import CConfigExecJob
+from catharsys.config.cls_job import CConfigJob
 from catharsys.action.cls_actionclass_executor import CActionClassExecutor
 from .cls_loopconfigs import CLoopConfigs
-
 import concurrent.futures
 
 
@@ -224,6 +226,12 @@ class CActionClassManifestExecutor(CActionClassExecutor):
 
     # enddef
 
+    @property
+    def sId(self) -> str:
+        return self.dicTrial.get("sId")
+
+    # enddef
+
     ######################################################################################
     def GetAction(self):
         return self.sAction
@@ -243,11 +251,8 @@ class CActionClassManifestExecutor(CActionClassExecutor):
     # enddef
 
     ######################################################################################
-    # Execute action
-    @logFunctionCall
-    def Execute(self, bDoProcess: bool = True, dicDebug: bool = None) -> CConfigManifestJob:
-        self.dicDebug = dicDebug
-
+    # Get Manifest Job Config
+    def GetJobConfig(self) -> CConfigManifestJob:
         sDT = datetime.now().strftime("%Y-%m-%d_%H-%M-%S")
 
         # Get the configuration loops
@@ -395,50 +400,83 @@ class CActionClassManifestExecutor(CActionClassExecutor):
             "iFramesPerGroup": iFramesPerGroup,
             "iMaxLocalWorkers": iMaxLocalWorkers,
             "sPathJobConfigMain": sPathJobConfigMain,
+            "mExec": self.dicExec,
             "lConfigs": lJobConfigs,
         }
-
-        if len(lJobConfigs) == 0:
-            print("WARNING: No configuration available to execute action '{0}'".format(self.sAction))
-
-        elif bDoProcess is True:
-            path.CreateDir(sPathJobConfigMain)
-
-            if self.sJobDistType == "single;all":
-                self._ExecJobs_SingleAll(sId=xLoopConfigs.GetId(), dicJob=dicJob, bDoProcess=bDoProcess)
-
-            elif self.sJobDistType == "frames;configs":
-                self._ExecJobs_FramesConfigs(sId=xLoopConfigs.GetId(), dicJob=dicJob, bDoProcess=bDoProcess)
-
-            elif self.sJobDistType == "per-frame;configs":
-                self._ExecJobs_PerFrameConfigs(sId=xLoopConfigs.GetId(), dicJob=dicJob, bDoProcess=bDoProcess)
-            else:
-                raise CAnyError_Message(sMsg=f"Unsupported job distribution type '{self.sJobDistType}'")
-            # endif
-        # endif
 
         return CConfigManifestJob(dicJob)
 
     # enddef
 
     ######################################################################################
+    # Split full job into list of executable jobs
+    def GetExecJobConfigList(self, _xJob: CConfigManifestJob) -> list[CConfigExecJob]:
+        lExecJobs: list[CConfigExecJob] = []
+
+        if _xJob.iConfigCount == 0:
+            print("WARNING: No configuration available to execute action '{0}'".format(self.sAction))
+            return lExecJobs
+        # endif
+
+        if self.sJobDistType == "single;all":
+            lExecJobs = self._GetJobs_SingleAll(sId=self.sId, dicJob=_xJob.dicData)
+
+        elif self.sJobDistType == "frames;configs":
+            lExecJobs = self._GetJobs_FramesConfigs(sId=self.sId, dicJob=_xJob.dicData)
+
+        elif self.sJobDistType == "per-frame;configs":
+            lExecJobs = self._GetJobs_PerFrameConfigs(sId=self.sId, dicJob=_xJob.dicData)
+        else:
+            raise CAnyError_Message(sMsg=f"Unsupported job distribution type '{self.sJobDistType}'")
+        # endif
+
+        return lExecJobs
+
+    # enddef
+
+    ######################################################################################
+    # Execute Job List
+    def ExecuteJobList(self, _lExecJobs: list[CConfigExecJob]):
+        iMaxLocalWorkers: int = convert.DictElementToInt(self.dicActArgs, "iMaxLocalWorkers", iDefault=1)
+        self._ExecJobsParallel(_lJobs=_lExecJobs, _iMaxLocalWorkers=iMaxLocalWorkers)
+
+    # enddef
+
+    ######################################################################################
+    # Execute action
+    @logFunctionCall
+    def Execute(self, *, bDoProcess: bool = True, dicDebug: bool = None) -> CConfigManifestJob:
+        self.dicDebug = dicDebug
+
+        xJob: CConfigManifestJob = self.GetJobConfig()
+
+        if bDoProcess is True:
+            lExecJobs = self.GetExecJobConfigList(xJob)
+            self.ExecuteJobList(lExecJobs)
+        # endif
+
+        return xJob
+
+    # enddef
+
+    ######################################################################################
     # Execute single job
     @logFunctionCall
-    def _ExecJobs_SingleAll(self, *, sId, dicJob, bDoProcess=True):
+    def _GetJobs_SingleAll(self, *, sId, dicJob) -> list[CConfigExecJob]:
         # This job distribution scheme simply enforces
         # iFrameGroups = 1 and iConfigGroups = 0.
         # In this way, there is one job per config that processes all frames.
         dicJob["iFrameGroups"] = 1
         dicJob["iConfigGroups"] = 0
 
-        self._ExecJobs_FramesConfigs(sId=sId, dicJob=dicJob, bDoProcess=bDoProcess)
+        return self._GetJobs_FramesConfigs(sId=sId, dicJob=dicJob)
 
     # enddef
 
     ######################################################################################
     # Execute jobs with distribution over frames
     @logFunctionCall
-    def _ExecJobs_FramesConfigs(self, *, sId, dicJob, bDoProcess=True):
+    def _GetJobs_FramesConfigs(self, *, sId, dicJob) -> list[CConfigExecJob]:
         iFrameFirst = self.dicActArgs.get("iFrameFirst", 0)
         iFrameLast = self.dicActArgs.get("iFrameLast", 0)
         iFrameStep = self.dicActArgs.get("iFrameStep", 1)
@@ -489,80 +527,66 @@ class CActionClassManifestExecutor(CActionClassExecutor):
         iJobCnt = iConfigGroups * iFrameGroups
         sIdName = self._ToIdName(sId)
 
-        iMaxLocalWorkers = dicJob["iMaxLocalWorkers"]
-        with concurrent.futures.ThreadPoolExecutor(max_workers=iMaxLocalWorkers) as xExecutor:
-            iJobIdx = 0
-            for iConfigGrpIdx in range(iConfigGroups):
-                iCfgStart = iConfigGrpIdx * iConfigsPerGroup
-                iCfgEnd = iCfgStart + iConfigsPerGroup
-                iCfgEnd = min(iCfgEnd, iConfigCnt)
-                lJobConfigs = dicJob["lConfigs"][iCfgStart:iCfgEnd]
+        # iMaxLocalWorkers = dicJob["iMaxLocalWorkers"]
+        lJobs: list[CConfigExecJob] = []
+        iJobIdx = 0
+        for iConfigGrpIdx in range(iConfigGroups):
+            iCfgStart = iConfigGrpIdx * iConfigsPerGroup
+            iCfgEnd = iCfgStart + iConfigsPerGroup
+            iCfgEnd = min(iCfgEnd, iConfigCnt)
+            lJobConfigs = dicJob["lConfigs"][iCfgStart:iCfgEnd]
 
-                for iFrameGrpIdx in range(iFrameGroups):
-                    sFileJobConfig = "{0}_job{1:02d}.json".format(sIdName, iJobIdx + 1)
-                    pathJobConfig = Path(dicJob["sPathJobConfigMain"]) / sFileJobConfig
-                    sJobName = "{0}:{1:02d}/{2:02d}".format(sIdName, iJobIdx + 1, iJobCnt)
+            for iFrameGrpIdx in range(iFrameGroups):
+                sFileJobConfig = "{0}_job{1:02d}.json".format(sIdName, iJobIdx + 1)
+                pathJobConfig = Path(dicJob["sPathJobConfigMain"]) / sFileJobConfig
+                sJobName = "{0}:{1:02d}/{2:02d}".format(sIdName, iJobIdx + 1, iJobCnt)
 
-                    for dicConfig in lJobConfigs:
-                        # Update the render config for this job
-                        dicConfig.update(
-                            {
-                                "iFrameFirst": iFrameGrpIdx * iFrameStep + iFrameFirst,
-                                "iFrameLast": iFrameLast,
-                                "iFrameStep": iFrameGroups * iFrameStep,
-                            }
-                        )
-                    # endfor
+                for dicConfig in lJobConfigs:
+                    # Update the render config for this job
+                    dicConfig.update(
+                        {
+                            "iFrameFirst": iFrameGrpIdx * iFrameStep + iFrameFirst,
+                            "iFrameLast": iFrameLast,
+                            "iFrameStep": iFrameGroups * iFrameStep,
+                        }
+                    )
+                # endfor
 
-                    dicJobConfig = {
-                        "sDTI": "/catharsys/action/config-list:1.1",
-                        "sAction": dicJob["sAction"],
-                        "sActDti": dicJob["sActDti"],
-                        "mPrjCfg": dicJob["mPrjCfg"],
-                        "iConfigGroupIdx": iConfigGrpIdx,
-                        "iConfigGroups": iConfigGroups,
-                        "iFrameGroupIdx": iFrameGrpIdx,
-                        "iFrameGroups": iFrameGroups,
-                        "sPathJobConfigMain": dicJob["sPathJobConfigMain"],
-                        "lConfigs": lJobConfigs,
-                    }
+                dicJobConfig = {
+                    "sDTI": "/catharsys/action/config-list:1.1",
+                    "sAction": dicJob["sAction"],
+                    "sActDti": dicJob["sActDti"],
+                    "mPrjCfg": dicJob["mPrjCfg"],
+                    "iConfigGroupIdx": iConfigGrpIdx,
+                    "iConfigGroups": iConfigGroups,
+                    "iFrameGroupIdx": iFrameGrpIdx,
+                    "iFrameGroups": iFrameGroups,
+                    "sPathJobConfigMain": dicJob["sPathJobConfigMain"],
+                    "mExec": dicJob["mExec"],
+                    "lConfigs": lJobConfigs,
+                }
 
-                    # Start the actual job
-                    if bDoProcess:
-                        # Save the render config to a file
-                        file.SaveJson(pathJobConfig, dicJobConfig, iIndent=4)
-                        logFunctionCall.PrintLog(f"save and start [job](file:\\\\{str(pathJobConfig)})")
-                        self.StartJobParallel(
-                            pathJobConfig=pathJobConfig,
-                            sJobName=sJobName,
-                            sJobNameLong=sFileJobConfig,
-                            xExecutor=xExecutor,
-                        )
-                    # endif
+                lJobs.append(
+                    CConfigExecJob(
+                        _iIdx=iJobIdx,
+                        _sName=sJobName,
+                        _sLabel=sFileJobConfig,
+                        _pathConfig=pathJobConfig,
+                        _dicConfig=dicJobConfig,
+                    )
+                )
+                iJobIdx += 1
+            # endfor frame groups
+        # endfor config groups
 
-                    iJobIdx += 1
-                # endfor frame groups
-            # endfor config groups
-
-            for futJob in concurrent.futures.as_completed(self.dicJobFutures):
-                dicArgs = self.dicJobFutures[futJob]
-                try:
-                    sName = dicArgs["sJobNameLong"]
-                    print(f"Finished job: {sName}")
-                    futJob.result()
-                except Exception as xEx:
-                    print(f"Exception running job:\n{(str(xEx))}")
-                # endtry
-            # endfor
-
-        # end with thread pool
+        return lJobs
 
     # enddef
 
     ######################################################################################
     # Execute jobs with distribution over frames
     @logFunctionCall
-    def _ExecJobs_PerFrameConfigs(self, *, sId, dicJob, bDoProcess=True):
+    def _GetJobs_PerFrameConfigs(self, *, sId, dicJob) -> list[CConfigExecJob]:
         iFrameFirst = self.dicActArgs.get("iFrameFirst", 0)
         iFrameLast = self.dicActArgs.get("iFrameLast", 0)
         iFrameStep = self.dicActArgs.get("iFrameStep", 1)
@@ -618,74 +642,99 @@ class CActionClassManifestExecutor(CActionClassExecutor):
         iJobCnt = iFrameCnt * iConfigGroups * iSubFrameGroups
         sIdName = self._ToIdName(sId)
 
-        iMaxLocalWorkers = dicJob["iMaxLocalWorkers"]
-        with concurrent.futures.ThreadPoolExecutor(max_workers=iMaxLocalWorkers) as xExecutor:
-            iJobIdx = 0
-            # Loop over frames
-            for iFrameIdx in range(iFrameFirst, iFrameLast + 1, iFrameStep):
-                # Loop over configs
-                for iConfigGrpIdx in range(iConfigGroups):
-                    iCfgStart = iConfigGrpIdx * iConfigsPerGroup
-                    iCfgEnd = iCfgStart + iConfigsPerGroup
-                    iCfgEnd = min(iCfgEnd, iConfigCnt)
-                    lJobConfigs = dicJob["lConfigs"][iCfgStart:iCfgEnd]
+        lJobs: list[CConfigExecJob] = []
+        iJobIdx = 0
+        # Loop over frames
+        for iFrameIdx in range(iFrameFirst, iFrameLast + 1, iFrameStep):
+            # Loop over configs
+            for iConfigGrpIdx in range(iConfigGroups):
+                iCfgStart = iConfigGrpIdx * iConfigsPerGroup
+                iCfgEnd = iCfgStart + iConfigsPerGroup
+                iCfgEnd = min(iCfgEnd, iConfigCnt)
+                lJobConfigs = dicJob["lConfigs"][iCfgStart:iCfgEnd]
 
-                    # Loop over jobs per frame
-                    for iSubFrameIdx in range(iSubFrameGroups):
-                        sFileJobConfig = "{0}_frm{1:02d}_job{2:02d}.json".format(sIdName, iFrameIdx, iJobIdx + 1)
-                        pathJobConfig = Path(dicJob["sPathJobConfigMain"]) / sFileJobConfig
-                        sJobName = "{0}:{1}/{2}>{3}.{4}.{5}".format(
-                            sIdName,
-                            iJobIdx + 1,
-                            iJobCnt,
-                            iFrameIdx,
-                            iConfigGrpIdx,
-                            iSubFrameIdx,
+                # Loop over jobs per frame
+                for iSubFrameIdx in range(iSubFrameGroups):
+                    sFileJobConfig = "{0}_frm{1:02d}_job{2:02d}.json".format(sIdName, iFrameIdx, iJobIdx + 1)
+                    pathJobConfig = Path(dicJob["sPathJobConfigMain"]) / sFileJobConfig
+                    sJobName = "{0}:{1}/{2}>{3}.{4}.{5}".format(
+                        sIdName,
+                        iJobIdx + 1,
+                        iJobCnt,
+                        iFrameIdx,
+                        iConfigGrpIdx,
+                        iSubFrameIdx,
+                    )
+
+                    for dicConfig in lJobConfigs:
+                        # Update the render config for this job
+                        dicConfig.update(
+                            {
+                                "iFrameFirst": iFrameIdx,
+                                "iFrameLast": iFrameIdx,
+                                "iFrameStep": 1,
+                                "iSubFrameOffset": iSubFrameIdx,
+                                "iSubFrameStep": iSubFrameGroups,
+                            }
                         )
+                    # endfor
 
-                        for dicConfig in lJobConfigs:
-                            # Update the render config for this job
-                            dicConfig.update(
-                                {
-                                    "iFrameFirst": iFrameIdx,
-                                    "iFrameLast": iFrameIdx,
-                                    "iFrameStep": 1,
-                                    "iSubFrameOffset": iSubFrameIdx,
-                                    "iSubFrameStep": iSubFrameGroups,
-                                }
-                            )
-                        # endfor
+                    dicJobConfig = {
+                        "sDTI": "/catharsys/action/config-list:1.1",
+                        "sAction": dicJob["sAction"],
+                        "sActDti": dicJob["sActDti"],
+                        "mPrjCfg": dicJob["mPrjCfg"],
+                        "iConfigGroupIdx": iConfigGrpIdx,
+                        "iConfigGroups": iConfigGroups,
+                        "iFrameGroupIdx": iSubFrameIdx,
+                        "iFrameGroups": iSubFrameGroups,
+                        "sPathJobConfigMain": dicJob["sPathJobConfigMain"],
+                        "mExec": dicJob["mExec"],
+                        "lConfigs": lJobConfigs,
+                    }
 
-                        dicJobConfig = {
-                            "sDTI": "/catharsys/action/config-list:1.1",
-                            "sAction": dicJob["sAction"],
-                            "sActDti": dicJob["sActDti"],
-                            "mPrjCfg": dicJob["mPrjCfg"],
-                            "iConfigGroupIdx": iConfigGrpIdx,
-                            "iConfigGroups": iConfigGroups,
-                            "iFrameGroupIdx": iSubFrameIdx,
-                            "iFrameGroups": iSubFrameGroups,
-                            "sPathJobConfigMain": dicJob["sPathJobConfigMain"],
-                            "lConfigs": lJobConfigs,
-                        }
+                    lJobs.append(
+                        CConfigExecJob(
+                            _iIdx=iJobIdx,
+                            _sName=sJobName,
+                            _sLabel=sFileJobConfig,
+                            _pathConfig=pathJobConfig,
+                            _dicConfig=dicJobConfig,
+                        )
+                    )
+                    iJobIdx += 1
+                # endfor sub-frames
+            # endfor configs
+        # endfor frames
 
-                        # Start the actual job
-                        if bDoProcess:
-                            # Save the render config to a file
-                            file.SaveJson(pathJobConfig, dicJobConfig, iIndent=4)
+        return lJobs
 
-                            self.StartJobParallel(
-                                pathJobConfig=pathJobConfig,
-                                sJobName=sJobName,
-                                sJobNameLong=sFileJobConfig,
-                                xExecutor=xExecutor,
-                            )
-                        # endif
+    # enddef
 
-                        iJobIdx += 1
-                    # endfor sub-frames
-                # endfor configs
-            # endfor frames
+    ######################################################################################
+    def _ExecJobsParallel(self, *, _lJobs: list[CConfigExecJob], _iMaxLocalWorkers: int):
+        if len(_lJobs) == 0:
+            return
+        # endif
+
+        with concurrent.futures.ThreadPoolExecutor(max_workers=_iMaxLocalWorkers) as xExecutor:
+            xExecJob: CConfigExecJob = None
+            for xExecJob in _lJobs:
+                sPathJobConfigMain: str = xExecJob.dicConfig["sPathJobConfigMain"]
+                path.CreateDir(sPathJobConfigMain)
+
+                # Start the actual job
+                # Save the render config to a file
+                file.SaveJson(xExecJob.pathConfig, xExecJob.dicConfig, iIndent=4)
+                logFunctionCall.PrintLog(f"save and start [job](file:\\\\{str(xExecJob.pathConfig)})")
+                self.StartJobParallel(
+                    pathJobConfig=xExecJob.pathConfig,
+                    sJobName=xExecJob.sName,
+                    sJobNameLong=xExecJob.sLabel,
+                    xProcHandler=xExecJob.xProcHandler,
+                    xExecutor=xExecutor,
+                )
+            # endfor job
 
             for futJob in concurrent.futures.as_completed(self.dicJobFutures):
                 dicArgs = self.dicJobFutures[futJob]
@@ -698,19 +747,27 @@ class CActionClassManifestExecutor(CActionClassExecutor):
                 # endtry
             # endfor
 
-        # endwith thread pool
+        # end with thread pool
 
     # enddef
 
     ###############################################################################
     @logFunctionCall
-    def StartJob(self, *, pathJobConfig, sJobName, sJobNameLong):
+    def StartJob(
+        self,
+        *,
+        pathJobConfig: Path,
+        sJobName: str,
+        sJobNameLong: str,
+        xProcHandler: CProcessHandler,
+    ):
         dicArgs = {
             "pathJobConfig": pathJobConfig,
             "sJobName": sJobName,
             "sJobNameLong": sJobNameLong,
             "dicTrial": self.dicTrial,
             "dicDebug": self.dicDebug,
+            "xProcessHandler": xProcHandler,
         }
 
         job.Start(xPrjCfg=self.xPrjCfg, dicExec=self.dicExec, dicArgs=dicArgs)
@@ -720,7 +777,13 @@ class CActionClassManifestExecutor(CActionClassExecutor):
     ###############################################################################
     @logFunctionCall
     def StartJobParallel(
-        self, *, pathJobConfig: Path, sJobName: str, sJobNameLong: str, xExecutor: concurrent.futures.ThreadPoolExecutor
+        self,
+        *,
+        pathJobConfig: Path,
+        sJobName: str,
+        sJobNameLong: str,
+        xProcHandler: CProcessHandler,
+        xExecutor: concurrent.futures.ThreadPoolExecutor,
     ):
         dicArgs = {
             "pathJobConfig": pathJobConfig,
@@ -728,6 +791,7 @@ class CActionClassManifestExecutor(CActionClassExecutor):
             "sJobNameLong": sJobNameLong,
             "dicTrial": self.dicTrial,
             "dicDebug": self.dicDebug,
+            "xProcessHandler": xProcHandler,
         }
 
         futJob = xExecutor.submit(job.Start, xPrjCfg=self.xPrjCfg, dicExec=self.dicExec, dicArgs=dicArgs)

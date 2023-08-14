@@ -35,6 +35,7 @@ from anybase import file as anyfile
 from catharsys.action.cls_actionfactory import CActionFactory
 from catharsys.action.cls_actionclass_executor import CActionClassExecutor
 from catharsys.config.cls_job import CConfigJob
+from catharsys.config.cls_exec_job import CConfigExecJob
 from catharsys.config.cls_project import CProjectConfig
 
 TProject = ForwardRef("Project")
@@ -109,7 +110,50 @@ class CAction:
             raise Exception("No action created")
         # endif
 
-        return self._xAction.Execute(bDoProcess=False)
+        return self._xAction.GetJobConfig()
+
+    # enddef
+
+    ##########################################################################
+    def GetExecJobConfigList(self, _xJobCfg: CConfigJob) -> list[CConfigExecJob]:
+        if self._xAction is None:
+            raise Exception("No action created")
+        # endif
+
+        return self._xAction.GetExecJobConfigList(_xJobCfg)
+
+    # enddef
+
+    ##########################################################################
+    def ExecuteJobList(self, _lExecJobs: list[CConfigExecJob], bPrintOutput: bool = False):
+        if self._xAction is None:
+            raise Exception("No action created")
+        # endif
+
+        xOrigStdOut = sys.stdout
+
+        if not bPrintOutput:
+            sFilename = "stdout_{0}.txt".format(self.sAction.replace("/", "_"))
+            pathStdOutFile = self._xPrjCfg.pathLaunch / sFilename
+            sys.stdout = pathStdOutFile.open("w")
+        # endif
+
+        xCfgJob = None
+
+        try:
+            xCfgJob = self._xAction.ExecuteJobList(_lExecJobs)
+
+        except Exception as xEx:
+            print("Exception in running action:\n{0}".format(str(xEx)))
+        finally:
+            if not bPrintOutput:
+                sys.stdout.close()
+                sys.stdout = xOrigStdOut
+                print("Action output written to: (use CTRL+LMB to open)\n{0}".format(pathStdOutFile.as_posix()))
+            # endif
+        # endexcept
+
+        return xCfgJob
 
     # enddef
 

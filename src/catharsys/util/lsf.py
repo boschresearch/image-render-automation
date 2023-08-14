@@ -33,15 +33,22 @@ from pathlib import Path
 import tempfile
 import platform
 
-from typing import Union, Tuple
+from typing import Union, Tuple, Optional
 from anybase import assertion, shell
+from anybase.cls_process_handler import CProcessHandler
 from anybase.cls_any_error import CAnyError_Message
 import catharsys.plugins.std
 from catharsys.config.cls_exec_lsf import CConfigExecLsf
 
 
 ################################################################################################
-def ExecBSub(*, sCommands: str, bDoPrint: bool = False, bDoPrintOnError: bool = False) -> Tuple[bool, list[str]]:
+def ExecBSub(
+    *,
+    sCommands: str,
+    bDoPrint: bool = False,
+    bDoPrintOnError: bool = False,
+    xProcHandler: Optional[CProcessHandler] = None,
+) -> Tuple[bool, list[str]]:
     # Only supported on Linux platforms
     if platform.system() != "Linux":
         raise CAnyError_Message(sMsg="Unsupported system '{}' for LSF job creation".format(platform.system()))
@@ -71,6 +78,7 @@ def ExecBSub(*, sCommands: str, bDoPrint: bool = False, bDoPrintOnError: bool = 
         bDoPrint=bDoPrint,
         bReturnStdOut=True,
         sPrintPrefix=">> ",
+        xProcHandler=xProcHandler,
     )
 
     # Delete temporary file with BSUB commands
@@ -90,6 +98,7 @@ def Execute(
     _sScript: str,
     _bDoPrint: bool = True,
     _bDoPrintOnError: bool = True,
+    _xProcHandler: Optional[CProcessHandler] = None,
 ) -> Tuple[bool, list[str]]:
     if len(_xCfgExecLsf.lModules) > 0:
         sSetLoadModules = "module load {0}".format(" ".join(_xCfgExecLsf.lModules))
@@ -162,7 +171,9 @@ def Execute(
         {_sScript}
     """
 
-    return ExecBSub(sCommands=sBsubScript, bDoPrint=_bDoPrint, bDoPrintOnError=_bDoPrintOnError)
+    return ExecBSub(
+        sCommands=sBsubScript, bDoPrint=_bDoPrint, bDoPrintOnError=_bDoPrintOnError, xProcHandler=_xProcHandler
+    )
 
 
 # enddef
