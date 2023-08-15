@@ -33,7 +33,7 @@ import random
 import numpy as np
 from datetime import datetime
 from pathlib import Path
-from typing import Optional
+from typing import Optional, Callable
 
 import ison
 from ison.util.data import AddLocalGlobalVars
@@ -252,7 +252,7 @@ class CActionClassManifestExecutor(CActionClassExecutor):
 
     ######################################################################################
     # Get Manifest Job Config
-    def GetJobConfig(self) -> CConfigManifestJob:
+    def GetJobConfig(self, *, _funcStatus: Optional[Callable[[int, int], None]] = None) -> CConfigManifestJob:
         sDT = datetime.now().strftime("%Y-%m-%d_%H-%M-%S")
 
         # Get the configuration loops
@@ -292,9 +292,13 @@ class CActionClassManifestExecutor(CActionClassExecutor):
             iCfgIdx = xLoopConfigs.GetTotalStepIdx()
 
             if iCfgIdx % 10 == 0:
-                logFunctionCall.PrintLog("Creating configs {}-{} of {}".format(iCfgIdx, iCfgIdx + 9, iCfgCnt))
-                sys.stdout.write("Creating configs {}-{} of {}           \r".format(iCfgIdx, iCfgIdx + 9, iCfgCnt))
-                sys.stdout.flush()
+                if _funcStatus is not None:
+                    _funcStatus(iCfgIdx, iCfgCnt)
+                else:
+                    logFunctionCall.PrintLog("Creating configs {}-{} of {}".format(iCfgIdx, iCfgIdx + 9, iCfgCnt))
+                    sys.stdout.write("Creating configs {}-{} of {}           \r".format(iCfgIdx, iCfgIdx + 9, iCfgCnt))
+                    sys.stdout.flush()
+                # endif
             # endif
 
             # print(f"Create config {iCfgIdx} of {iCfgCnt}")
@@ -359,8 +363,12 @@ class CActionClassManifestExecutor(CActionClassExecutor):
             # print("...finished")
         # endwhile configs
 
-        sys.stdout.write("                                             \r")
-        sys.stdout.flush()
+        if _funcStatus is not None:
+            _funcStatus(iCfgCnt, iCfgCnt)
+        else:
+            sys.stdout.write("                                             \r")
+            sys.stdout.flush()
+        # endif
 
         # dTimeEnd = timer()
         # dTimeDelta = dTimeEnd - dTimeStart

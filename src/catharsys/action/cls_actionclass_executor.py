@@ -24,7 +24,7 @@
 # </LICENSE>
 ###
 
-from typing import Optional
+from typing import Optional, Callable
 
 from catharsys.config.cls_project import CProjectConfig
 from catharsys.config.cls_launch import CConfigLaunch
@@ -82,7 +82,7 @@ class CActionClassExecutor:
     # enddef
 
     ######################################################################################
-    def GetJobConfig(self) -> CConfigJob:
+    def GetJobConfig(self, *, _funcStatus: Optional[Callable[[int, int], None]] = None) -> CConfigJob:
         return None
 
     # enddef

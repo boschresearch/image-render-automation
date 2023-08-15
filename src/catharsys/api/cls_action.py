@@ -27,7 +27,7 @@
 import sys
 import copy
 
-from typing import Optional, Union, ForwardRef
+from typing import Optional, Union, ForwardRef, Callable
 from pathlib import Path
 
 import ison
@@ -105,12 +105,12 @@ class CAction:
     # enddef
 
     ##########################################################################
-    def GetJobConfig(self) -> CConfigJob:
+    def GetJobConfig(self, *, _funcStatus: Optional[Callable[[int, int], None]] = None) -> CConfigJob:
         if self._xAction is None:
             raise Exception("No action created")
         # endif
 
-        return self._xAction.GetJobConfig()
+        return self._xAction.GetJobConfig(_funcStatus=_funcStatus)
 
     # enddef
 
