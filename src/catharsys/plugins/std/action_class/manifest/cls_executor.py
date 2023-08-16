@@ -728,6 +728,10 @@ class CActionClassManifestExecutor(CActionClassExecutor):
         with concurrent.futures.ThreadPoolExecutor(max_workers=_iMaxLocalWorkers) as xExecutor:
             xExecJob: CConfigExecJob = None
             for xExecJob in _lJobs:
+                if xExecJob.xProcHandler.bPollTerminateAvailable and xExecJob.xProcHandler.PollTerminate() is True:
+                    continue
+                # endif
+
                 sPathJobConfigMain: str = xExecJob.dicConfig["sPathJobConfigMain"]
                 path.CreateDir(sPathJobConfigMain)
 
