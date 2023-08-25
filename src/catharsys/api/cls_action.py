@@ -38,7 +38,7 @@ from catharsys.config.cls_job import CConfigJob
 from catharsys.config.cls_exec_job import CConfigExecJob
 from catharsys.config.cls_project import CProjectConfig
 
-TProject = ForwardRef("Project")
+TProject = ForwardRef("CProject")
 
 
 ########################################################################################
