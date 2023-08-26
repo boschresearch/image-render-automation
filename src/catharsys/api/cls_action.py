@@ -26,7 +26,7 @@
 
 import sys
 import copy
-
+from timeit import default_timer as timer
 from typing import Optional, Union, ForwardRef, Callable
 from pathlib import Path
 
@@ -65,9 +65,26 @@ class CAction:
         self._xProject = _xProject
         self._xPrjCfg = self._xProject.xConfig
 
+        # tmStart = timer()
         self._xActFact = CActionFactory(xPrjCfg=self._xPrjCfg)
+        # tmValue = timer() - tmStart
+        # print(f"time 1: {tmValue}")
+
+        # tmStart = timer()
         self._xAction = self._xActFact.CreateAction(sAction=self._sAction, dicConfigOverride=self._dicConfigOverride)
-        self._xAction.Init()
+        # tmValue = timer() - tmStart
+        # print(f"time 2: {tmValue}")
+
+        self._bActionInit: bool = False
+
+    # enddef
+
+    ####################################################################################
+    def _EnsureActionInit(self):
+        if self._bActionInit is False:
+            self._xAction.Init()
+            self._bActionInit = True
+        # endif
 
     # enddef
 
@@ -76,6 +93,8 @@ class CAction:
         if self._xAction is None:
             raise Exception("No action created")
         # endif
+
+        self._EnsureActionInit()
 
         xOrigStdOut = sys.stdout
 
@@ -109,6 +128,7 @@ class CAction:
         if self._xAction is None:
             raise Exception("No action created")
         # endif
+        self._EnsureActionInit()
 
         return self._xAction.GetJobConfig(_funcStatus=_funcStatus)
 
@@ -119,6 +139,7 @@ class CAction:
         if self._xAction is None:
             raise Exception("No action created")
         # endif
+        self._EnsureActionInit()
 
         return self._xAction.GetExecJobConfigList(_xJobCfg)
 
@@ -129,6 +150,7 @@ class CAction:
         if self._xAction is None:
             raise Exception("No action created")
         # endif
+        self._EnsureActionInit()
 
         xOrigStdOut = sys.stdout
 

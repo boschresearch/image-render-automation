@@ -24,6 +24,7 @@ from typing import Optional
 from pathlib import Path
 from anybase import config
 from anybase import path as anypath
+from anybase import link as anylink
 
 from .cls_project import CProject
 from .cls_workspace import CWorkspace
@@ -94,6 +95,12 @@ class CVariants:
     @property
     def xWorkspace(self) -> CWorkspace:
         return self._xProject.xWorkspace
+
+    # enddef
+
+    @property
+    def xProject(self) -> CProject:
+        return self._xProject
 
     # enddef
 
@@ -193,21 +200,26 @@ class CVariants:
 
     # enddef
 
-    # ############################################################################################
-    # def GetInstances(self) -> list[CVariantInstance]:
-    #     pathInstances = self.pathInstances
-    #     pathInstances.mkdir(parents=True, exist_ok=True)
+    ############################################################################################
+    def GetInstances(self) -> list[CVariantInstance]:
+        pathInstances = self.pathInstances
+        pathInstances.mkdir(parents=True, exist_ok=True)
+        lInst: list[CVariantInstance] = []
 
-    #     for pathInst in pathInstances.iterdir():
-    #         if not pathInst.is_dir():
-    #             continue
-    #         # endif
-    #         xMatch = CVariants.c_reFolderInst.fullmatch(pathInst.name)
-    #         if xMatch is None:
-    #             continue
-    #         # endif
+        for pathInst in pathInstances.iterdir():
+            if not pathInst.is_dir():
+                continue
+            # endif
+            if not CVariantInstance.IsInstancePath(pathInst):
+                continue
+            # endif
 
-    #     sInstFolder: str = f"{_sGroup}-{_iLaunchId}-{_iTrialId}"
+            lInst.append(CVariantInstance(_pathInstances=self.pathInstances).FromPath(pathInst))
+        # endfor
+
+        return lInst
+
+    # enddef
 
     # ############################################################################################
     def CreateInstance(self, *, _sGroup: str, _iLaunchId: int, _iTrialId: int) -> CVariantInstance:
@@ -218,13 +230,22 @@ class CVariants:
         xInst = CVariantInstance(_pathInstances=self.pathInstances)
         xInst.Create(_sGroup=_sGroup, _iLaunchId=_iLaunchId, _iTrialId=_iTrialId)
 
-        lReExcludeDirs: list[str] = [r"^\..+"]
+        lReExcludeDirs: list[str] = [r"^(\.|_).+"]
         lReExcludeFiles: list[str] = [r".+\.ipynb$"]
 
         # Copy source configurations
         fsops.CopyFilesInDir(
             self.pathLaunch, xInst.pathInstance, lReExcludeDirs=lReExcludeDirs, lReExcludeFiles=lReExcludeFiles
         )
+
+        # Copy folders that start with "_" as symbolic links
+        pathSrc: Path = None
+        for pathSrc in self.pathLaunch.iterdir():
+            if pathSrc.is_dir() and pathSrc.name.startswith("_"):
+                pathTrg = xInst.pathInstance / pathSrc.name
+                anylink.symlink(pathSrc.as_posix(), pathTrg.as_posix())
+            # endif
+        # endfor
 
         # Check whether launch file exists with one of the possible extensions
         pathTrgFile = anypath.ProvideReadFilepathExt(
@@ -244,7 +265,7 @@ class CVariants:
         pathTrg: Path = None
         bIsConfigFile: bool = False
         for pathSrc, pathTrg in lSrcTrgPaths:
-            # Remove target files if the exist under the same name but with possibly different configuration suffix
+            # Remove target files if they exist under the same name but with possibly different configuration suffix
             if pathTrg.suffix in CVariants.c_lConfigSuffix:
                 bIsConfigFile = True
                 pathTest = pathTrg.parent / pathTrg.stem

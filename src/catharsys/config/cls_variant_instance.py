@@ -34,6 +34,7 @@ class CVariantInstance:
     def __init__(self, *, _pathInstances: Path):
         self._pathMain: Path = _pathInstances
         self._pathInst: Path = None
+        self._sPrjId: str = None
         self._sGroup: str = None
         self._iLaunchId: int = None
         self._iTrialId: int = None
@@ -83,6 +84,12 @@ class CVariantInstance:
 
     # enddef
 
+    @property
+    def sProjectId(self) -> str:
+        return self._sPrjId
+
+    # enddef
+
     # ############################################################################################
     @classmethod
     def IsInstanceFolder(cls, _sFolderName: str) -> bool:
@@ -98,7 +105,20 @@ class CVariantInstance:
     # enddef
 
     # ############################################################################################
-    def FromPath(self, _pathInst: Path):
+    def _CreatePrjId(self):
+        tParts = self._pathInst.parts
+        try:
+            iStart = tParts.index("config") + 1
+            iEnd = tParts.index(".variants")
+            self._sPrjId = "/".join(tParts[iStart:iEnd])
+        except Exception:
+            self._sPrjId = self.sName
+        # endtry
+
+    # enddef
+
+    # ############################################################################################
+    def FromPath(self, _pathInst: Path) -> "CVariantInstance":
         xMatch: re.Pattern = CVariantInstance.c_reFolderInstance.fullmatch(_pathInst.name)
         if xMatch is None:
             raise RuntimeError(f"Path is not a variant instance path: {(_pathInst.as_posix())}")
@@ -110,10 +130,16 @@ class CVariantInstance:
         self._uidInst = uuid.UUID(xMatch.group("uid"))
         self._pathInst = self._pathMain / self.sInstanceFolderName
 
+        self._CreatePrjId()
+
+        return self
+
     # enddef
 
     # ############################################################################################
-    def Create(self, *, _sGroup: str, _iLaunchId: int, _iTrialId: int, _sUUID: Optional[str] = None):
+    def Create(
+        self, *, _sGroup: str, _iLaunchId: int, _iTrialId: int, _sUUID: Optional[str] = None
+    ) -> "CVariantInstance":
         self._sGroup = _sGroup
         self._iLaunchId = _iLaunchId
         self._iTrialId = _iTrialId
@@ -126,8 +152,10 @@ class CVariantInstance:
         # endif
 
         self._pathInst = self._pathMain / self.sInstanceFolderName
+        self._CreatePrjId()
 
         self._pathInst.mkdir(parents=True, exist_ok=True)
+        return self
 
     # enddef
 
