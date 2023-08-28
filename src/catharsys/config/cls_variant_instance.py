@@ -21,15 +21,21 @@
 ###
 
 import re
-import uuid
-from typing import Optional
+import json
+import copy
+import hashlib
+from datetime import datetime
+from typing import Optional, Any
 from pathlib import Path
+
+from anybase import config
+from anybase.cls_any_error import CAnyError_Message
 from catharsys.api.cls_project import CProject
 from catharsys.config.cls_project import CProjectConfig
 
 
 class CVariantInstance:
-    c_reFolderInstance = re.compile(r"(?P<group>[a-zA-Z0-9\-_]+)-(?P<lid>\d+)-(?P<tid>\d+)@(?P<uid>[A-Fa-f0-9\-]+)")
+    c_reFolderInstance = re.compile(r"^(?P<group>[a-zA-Z0-9\-_]+)-(?P<lid>\d+)-(?P<tid>\d+)")
 
     def __init__(self, *, _pathInstances: Path):
         self._pathMain: Path = _pathInstances
@@ -38,7 +44,10 @@ class CVariantInstance:
         self._sGroup: str = None
         self._iLaunchId: int = None
         self._iTrialId: int = None
-        self._uidInst: uuid.UUID = None
+        self._sHash: str = None
+        self._sTypeHash: str = None
+        self._dtCreated: datetime = None
+        self._dicMeta: dict[str, Any] = None
 
     # enddef
 
@@ -61,8 +70,26 @@ class CVariantInstance:
     # enddef
 
     @property
-    def uidInstance(self) -> uuid.UUID:
-        return self._uidInst
+    def sId(self) -> str:
+        return self._sHash
+
+    # enddef
+
+    @property
+    def sTypeId(self) -> str:
+        return self._sTypeHash
+
+    # enddef
+
+    @property
+    def dtCreated(self) -> datetime:
+        return self._dtCreated
+
+    # enddef
+
+    @property
+    def sTimeCreated(self) -> str:
+        return self._dtCreated.strftime("%d %b %Y, %H:%M:%S.%f")
 
     # enddef
 
@@ -73,14 +100,20 @@ class CVariantInstance:
     # enddef
 
     @property
+    def pathInstanceConfig(self) -> Path:
+        return self.pathInstance / ".instance.json"
+
+    # enddef
+
+    @property
     def sName(self) -> str:
         return f"{self._sGroup}-{self._iLaunchId}-{self._iTrialId}"
 
     # enddef
 
     @property
-    def sInstanceFolderName(self) -> str:
-        return f"{self.sName}@{self._uidInst}"
+    def dicMeta(self) -> dict[str, Any]:
+        return self._dicMeta
 
     # enddef
 
@@ -93,7 +126,7 @@ class CVariantInstance:
     # ############################################################################################
     @classmethod
     def IsInstanceFolder(cls, _sFolderName: str) -> bool:
-        return cls.c_reFolderInstance.fullmatch(_sFolderName) is not None
+        return cls.c_reFolderInstance.match(_sFolderName) is not None
 
     # enddef
 
@@ -105,32 +138,46 @@ class CVariantInstance:
     # enddef
 
     # ############################################################################################
-    def _CreatePrjId(self):
-        tParts = self._pathInst.parts
-        try:
-            iStart = tParts.index("config") + 1
-            iEnd = tParts.index(".variants")
-            self._sPrjId = "/".join(tParts[iStart:iEnd])
-        except Exception:
-            self._sPrjId = self.sName
-        # endtry
+    def IsEqual(self, _xClass: "CVariantInstance") -> bool:
+        if isinstance(_xClass, self.__class__):
+            return self.sId == _xClass.sId
+        # endif
+        return False
+
+    # enddef
+
+    # ############################################################################################
+    def IsEqualType(self, _xClass: "CVariantInstance") -> bool:
+        if isinstance(_xClass, self.__class__):
+            return self.sTypeId == _xClass.sTypeId
+        # endif
+        return False
 
     # enddef
 
     # ############################################################################################
     def FromPath(self, _pathInst: Path) -> "CVariantInstance":
-        xMatch: re.Pattern = CVariantInstance.c_reFolderInstance.fullmatch(_pathInst.name)
+        xMatch: re.Pattern = CVariantInstance.c_reFolderInstance.match(_pathInst.name)
         if xMatch is None:
             raise RuntimeError(f"Path is not a variant instance path: {(_pathInst.as_posix())}")
         # endif
-
-        self._sGroup = xMatch.group("group")
-        self._iLaunchId = int(xMatch.group("lid"))
-        self._iTrialId = int(xMatch.group("tid"))
-        self._uidInst = uuid.UUID(xMatch.group("uid"))
-        self._pathInst = self._pathMain / self.sInstanceFolderName
-
-        self._CreatePrjId()
+        self._pathInst = _pathInst
+        try:
+            dicData = config.Load(self.pathInstanceConfig, sDTI="/catharsys/variant/instance:1", bReplacePureVars=False)
+            self._sHash = dicData["sHash"]
+            self._sTypeHash = dicData["sTypeHash"]
+            self._sGroup = dicData["sGroup"]
+            self._iLaunchId = dicData["iLaunchId"]
+            self._iTrialId = dicData["iTrialId"]
+            self._sPrjId = dicData["sPrjId"]
+            self._dtCreated = datetime.strptime(dicData["sTimeCreated"], "%d %b %Y, %H:%M:%S.%f")
+            self._dicMeta = dicData["mMeta"]
+        except Exception as xEx:
+            raise CAnyError_Message(
+                sMsg=f"Error initializing variant instance from configuration file: {self.pathInstanceConfig}",
+                xChildEx=xEx,
+            )
+        # endtry
 
         return self
 
@@ -138,24 +185,75 @@ class CVariantInstance:
 
     # ############################################################################################
     def Create(
-        self, *, _sGroup: str, _iLaunchId: int, _iTrialId: int, _sUUID: Optional[str] = None
+        self, *, _sPrjId: str, _sGroup: str, _iLaunchId: int, _iTrialId: int, _dicMeta: Optional[dict[str, Any]] = None
     ) -> "CVariantInstance":
         self._sGroup = _sGroup
         self._iLaunchId = _iLaunchId
         self._iTrialId = _iTrialId
-        self._uidInst = None
+        self._sPrjId = _sPrjId
+        self._dtCreated = datetime.now()
 
-        if not isinstance(_sUUID, str):
-            self._uidInst = uuid.uuid4()
+        if isinstance(_dicMeta, dict):
+            self._dicMeta = copy.deepcopy(_dicMeta)
         else:
-            self._uidInst = uuid.UUID(hex=_sUUID)
+            self._dicMeta = dict()
         # endif
 
-        self._pathInst = self._pathMain / self.sInstanceFolderName
-        self._CreatePrjId()
+        try:
+            sMeta = json.dumps(self._dicMeta)
+        except Exception as xEx:
+            raise CAnyError_Message(sMsg="Variant instance meta data must be json serializable", xChildEx=xEx)
+        # endtry
 
-        self._pathInst.mkdir(parents=True, exist_ok=True)
+        sData = f"{self._sGroup}-{self._sPrjId}-{self._iLaunchId}-{self._iTrialId}:{sMeta}"
+        self._sTypeHash = hashlib.md5(sData.encode("utf-8")).hexdigest()
+
+        sData = f"{self._sTypeHash}:{self.sTimeCreated}"
+        self._sHash = hashlib.md5(sData.encode("utf-8")).hexdigest()
+
+        # Ensure that the main instance path exists
+        self._pathMain.mkdir(parents=True, exist_ok=True)
+
+        # Find available folder name
+        iHashDigits: int = 1
+        sFolderName: str = self.sName
+        while True:
+            self._pathInst = self._pathMain / sFolderName
+            if not self._pathInst.exists():
+                break
+            # endif
+            sHash = self._sHash[0:iHashDigits]
+            sFolderName = f"{self.sName}@{sHash}"
+            iHashDigits += 1
+        # endwhile
+
+        self._pathInst.mkdir(parents=True)
+        self._Serialize()
+
         return self
+
+    # enddef
+
+    # ############################################################################################
+    def _Serialize(self):
+        try:
+            dicData = {
+                "sHash": self._sHash,
+                "sTypeHash": self._sTypeHash,
+                "sGroup": self._sGroup,
+                "iLaunchId": self._iLaunchId,
+                "iTrialId": self._iTrialId,
+                "sPrjId": self._sPrjId,
+                "sTimeCreated": self.sTimeCreated,
+                "mMeta": self._dicMeta,
+            }
+            config.Save(self.pathInstanceConfig, dicData, sDTI="/catharsys/variant/instance:1.0")
+        except Exception as xEx:
+            raise CAnyError_Message(
+                sMsg=f"Error serializing variant instance: {self._sGroup}, {self._iLaunchId}, {self._iTrialId}",
+                xChildEx=xEx,
+            )
+        # endtry
 
     # enddef
 

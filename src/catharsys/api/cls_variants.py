@@ -20,7 +20,7 @@
 # </LICENSE>
 ###
 
-from typing import Optional
+from typing import Optional, Any
 from pathlib import Path
 from anybase import config
 from anybase import path as anypath
@@ -222,13 +222,17 @@ class CVariants:
     # enddef
 
     # ############################################################################################
-    def CreateInstance(self, *, _sGroup: str, _iLaunchId: int, _iTrialId: int) -> CVariantInstance:
+    def CreateInstance(
+        self, *, _sGroup: str, _iLaunchId: int, _iTrialId: int, _dicMeta: dict[str, Any] = None
+    ) -> CVariantInstance:
         xGroup: CVariantGroup = self.GetGroup(_sGroup)
         xLaunch: CVariantLaunch = xGroup.GetLaunchVariant(_iLaunchId)
         xTrial: CVariantTrial = xLaunch.GetTrialVariant(_iTrialId)
 
         xInst = CVariantInstance(_pathInstances=self.pathInstances)
-        xInst.Create(_sGroup=_sGroup, _iLaunchId=_iLaunchId, _iTrialId=_iTrialId)
+        xInst.Create(
+            _sPrjId=self.xProject.sId, _sGroup=_sGroup, _iLaunchId=_iLaunchId, _iTrialId=_iTrialId, _dicMeta=_dicMeta
+        )
 
         lReExcludeDirs: list[str] = [r"^(\.|_).+"]
         lReExcludeFiles: list[str] = [r".+\.ipynb$"]
