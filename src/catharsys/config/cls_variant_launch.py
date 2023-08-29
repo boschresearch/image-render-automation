@@ -47,8 +47,13 @@ class CVariantLaunch:
         self._pathVariant: Path = None
 
         self._xProject: CProject = None
-        self._pathLaunchFile: Path = None
+        # self._pathLaunchFile: Path = None
         self._xLaunch: CConfigLaunch = None
+        self._sSrcLaunchFilename: str = None
+        self._sLaunchFileStem: str = None
+        self._setLaunchFileIds: set[int] = None
+        self._iSelectedLaunchFileId: int = None
+        self._iNextLaunchFileId: int = 1
 
         self._iId: int = None
         self._sInfo: str = None
@@ -60,7 +65,7 @@ class CVariantLaunch:
 
     @property
     def pathLaunchFile(self) -> Path:
-        return self._pathLaunchFile
+        return self.GetPathLaunchFile(self._iSelectedLaunchFileId)
 
     # enddef
 
@@ -73,6 +78,42 @@ class CVariantLaunch:
     @property
     def lTrialVariantIds(self) -> list[int]:
         return list(self._dicTrialVariants.keys())
+
+    # enddef
+
+    @property
+    def setLaunchFileIds(self) -> set[int]:
+        return self._setLaunchFileIds.copy()
+
+    # enddef
+
+    @property
+    def iSelectedLaunchFileId(self) -> int:
+        return self._iSelectedLaunchFileId
+
+    # enddef
+
+    @property
+    def iLaunchFileVariantCount(self) -> int:
+        return len(self._setLaunchFileIds)
+
+    # enddef
+
+    # ############################################################################################
+    def GetLaunchFilename(self, _iId: int) -> str:
+        return f"{self._sLaunchFileStem}-{_iId}.json"
+
+    # enddef
+
+    # ############################################################################################
+    def GetPathLaunchFile(self, _iId: int) -> Path:
+        return self._pathVariant / self.GetLaunchFilename(_iId)
+
+    # enddef
+
+    # ############################################################################################
+    def GetPathSourceLaunchFile(self) -> Path:
+        return self._xProject.xConfig.pathLaunch / self._sSrcLaunchFilename
 
     # enddef
 
@@ -92,10 +133,13 @@ class CVariantLaunch:
 
         self._sInfo = convert.DictElementToString(_dicCfg, "sInfo", sDefault="")
         self._iNextTrialVarId = convert.DictElementToInt(_dicCfg, "iNextTrialVarId")
-        sLaunchFilename = convert.DictElementToString(_dicCfg, "sLaunchFilename")
-        self._pathLaunchFile = self._pathVariant / sLaunchFilename
+        self._sSrcLaunchFilename = convert.DictElementToString(_dicCfg, "sSrcLaunchFilename")
+        self._sLaunchFileStem = convert.DictElementToString(_dicCfg, "sLaunchFileStem")
+        self._setLaunchFileIds = set(convert.DictElementToIntList(_dicCfg, "lLaunchFileIds"))
+        self._iSelectedLaunchFileId = convert.DictElementToInt(_dicCfg, "iSelectedLaunchFileId")
+        self._iNextLaunchFileId = convert.DictElementToInt(_dicCfg, "iNextLaunchFileId")
 
-        self._xLaunch = CConfigLaunch(config.Load(self._pathLaunchFile, bReplacePureVars=False))
+        self._xLaunch = CConfigLaunch(config.Load(self.pathLaunchFile, bReplacePureVars=False))
 
         self._dicTrialVariants = {}
         dicCfgTrialVariants: dict = _dicCfg.get("mTrialVariants")
@@ -108,7 +152,10 @@ class CVariantLaunch:
             iTrialVarId: int = int(sTrialVarId)
             xVarTrial = CVariantTrial()
             xVarTrial.FromConfig(
-                _prjX=self._xProject, _pathGroup=self._pathVariant, _xLaunch=self._xLaunch, _dicCfg=dicCfgTrialVariants[sTrialVarId]
+                _prjX=self._xProject,
+                _pathGroup=self._pathVariant,
+                _xLaunch=self._xLaunch,
+                _dicCfg=dicCfgTrialVariants[sTrialVarId],
             )
             self._dicTrialVariants[iTrialVarId] = xVarTrial
         # endfor
@@ -129,12 +176,16 @@ class CVariantLaunch:
         self._pathGroup = _pathGroup
         self._xProject = _prjX
         pathSrcLaunchFile = self._xProject.xConfig.pathLaunchFile
-        self._pathLaunchFile = self._pathVariant / f"{pathSrcLaunchFile.stem}.json"
+        self._sSrcLaunchFilename = pathSrcLaunchFile.name
+        self._sLaunchFileStem = pathSrcLaunchFile.stem
+        self._setLaunchFileIds.add(self._iNextLaunchFileId)
+        self._iSelectedLaunchFileId = self._iNextLaunchFileId
+        self._iNextLaunchFileId += 1
         self._dicTrialVariants = {}
 
         # Load launch file and save as standard json
         dicLaunch = config.Load(pathSrcLaunchFile, sDTI="/catharsys/launch:*", bReplacePureVars=False)
-        config.Save(self._pathLaunchFile, dicLaunch)
+        config.Save(self.pathLaunchFile, dicLaunch)
         self._xLaunch = CConfigLaunch(dicLaunch)
 
         # shutil.copyfile(pathSrcLaunchFile.as_posix(), self._pathLaunchFile.as_posix())
@@ -144,10 +195,72 @@ class CVariantLaunch:
     # enddef
 
     # ############################################################################################
+    def AddLaunchFileVariant(self, *, _bSelect: bool = False, _bCopyCurrent: bool = True) -> int:
+        self._setLaunchFileIds.add(self._iNextLaunchFileId)
+        iNewId: int = self._iNextLaunchFileId
+        self._iNextLaunchFileId += 1
+
+        if _bCopyCurrent is True:
+            dicLaunch = config.Load(self.pathLaunchFile, sDTI="/catharsys/launch:*", bReplacePureVars=False)
+        else:
+            dicLaunch = config.Load(self.GetPathSourceLaunchFile(), sDTI="/catharsys/launch:*", bReplacePureVars=False)
+        # endif
+
+        pathNewLaunch = self.GetPathLaunchFile(iNewId)
+        config.Save(pathNewLaunch, dicLaunch)
+
+        if _bSelect is True:
+            self.SelectLaunchFileVariant(iNewId)
+        # endif
+
+        return iNewId
+
+    # enddef
+
+    # ############################################################################################
+    def RemoveLaunchFileVariant(self, _iId: int):
+        if _iId not in self._setLaunchFileIds:
+            raise RuntimeError(f"Launch file variant with id '{_iId}' not available")
+        # endif
+
+        if len(self._setLaunchFileIds) <= 1:
+            raise RuntimeError("Cannot remove last launch file variant")
+        # endif
+
+        pathLaunchFile = self.GetPathLaunchFile(_iId)
+        pathLaunchFile.unlink(missing_ok=True)
+        self._setLaunchFileIds.discard(_iId)
+
+        if self._iSelectedLaunchFileId == _iId:
+            iNewId = next((x for x in self._setLaunchFileIds))
+            self.SelectLaunchFileVariant(iNewId)
+        # endif
+
+    # enddef
+
+    # ############################################################################################
+    def SelectLaunchFileVariant(self, _iId: int):
+        if _iId not in self._setLaunchFileIds:
+            raise RuntimeError(f"Launch file variant id '{_iId}' not available")
+        # endif
+        self._iSelectedLaunchFileId = _iId
+
+        self._xLaunch = CConfigLaunch(config.Load(self.pathLaunchFile, bReplacePureVars=False))
+
+        xVarTrial: CVariantTrial = None
+        for xVarTrial in self._dicTrialVariants.values():
+            xVarTrial.UpdateLaunchConfig(self._xLaunch)
+        # endfor
+
+    # enddef
+
+    # ############################################################################################
     def AddTrialVariant(self, *, _sInfo: str = "") -> int:
         iId = self._iNextTrialVarId
         xVarTrial = CVariantTrial()
-        xVarTrial.Create(_iId=iId, _sInfo=_sInfo, _pathGroup=self._pathVariant, _prjX=self._xProject, _xLaunch=self._xLaunch)
+        xVarTrial.Create(
+            _iId=iId, _sInfo=_sInfo, _pathGroup=self._pathVariant, _prjX=self._xProject, _xLaunch=self._xLaunch
+        )
         self._dicTrialVariants[iId] = xVarTrial
         self._iNextTrialVarId += 1
 
@@ -163,19 +276,22 @@ class CVariantLaunch:
 
     # ############################################################################################
     def UpdateFromSource(self, *, _bOverwrite: Optional[bool] = False):
-        pathSrc: Path = self._xProject.xConfig.pathLaunch / self._pathLaunchFile.stem
-        pathFullSrc = anypath.ProvideReadFilepathExt(pathSrc, [".json", ".json5", ".ison"])
-        if pathFullSrc is None:
-            raise RuntimeError(f"Source launch file not found at: {(pathFullSrc.as_posix())}[.json|.json5|.ison]")
+        pathSrc: Path = self.GetPathSourceLaunchFile()
+        # pathFullSrc = anypath.ProvideReadFilepathExt(pathSrc, [".json", ".json5", ".ison"])
+        if not pathSrc.exists():
+            raise RuntimeError(f"Source launch file not found at: {(pathSrc.as_posix())}")
         # endif
-        pathSrc = pathFullSrc
+        # pathSrc = pathFullSrc
 
         dicLaunch = config.Load(pathSrc, bReplacePureVars=False)
-        if _bOverwrite is False:
-            dicLaunchAct = config.Load(self._pathLaunchFile, bReplacePureVars=False)
-            DictRecursiveUpdate(dicLaunch, dicLaunchAct, _lRegExExclude=["sTrialFile"], _bAddSrcKeysNotInTrg=False)
-        # endif
-        config.Save(self._pathLaunchFile, dicLaunch)
+        for iId in self._setLaunchFileIds:
+            pathLaunchFile: Path = self.GetPathLaunchFile(iId)
+            if _bOverwrite is False:
+                dicLaunchAct = config.Load(pathLaunchFile, bReplacePureVars=False)
+                DictRecursiveUpdate(dicLaunch, dicLaunchAct, _lRegExExclude=["sTrialFile"], _bAddSrcKeysNotInTrg=False)
+            # endif
+            config.Save(pathLaunchFile, dicLaunch)
+        # endfor
 
         for iTrialVarId in self._dicTrialVariants:
             self._dicTrialVariants[iTrialVarId].UpdateFromSource(_bOverwrite=_bOverwrite)
@@ -195,7 +311,11 @@ class CVariantLaunch:
             "iId": self._iId,
             "sInfo": self._sInfo,
             "iNextTrialVarId": self._iNextTrialVarId,
-            "sLaunchFilename": self._pathLaunchFile.name,
+            "sSrcLaunchFilename": self._sSrcLaunchFilename,
+            "sLaunchFileStem": self._sLaunchFileStem,
+            "lLaunchFileIds": list(self._setLaunchFileIds),
+            "iSelectedLaunchFileId": self._iSelectedLaunchFileId,
+            "iNextLaunchFileId": self._iNextLaunchFileId,
             "mTrialVariants": dicTrialVars,
         }
 

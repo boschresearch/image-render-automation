@@ -58,7 +58,13 @@ class CVariantTrial:
 
     # enddef
 
-    # ############################################################################################
+
+    # ##################################c##########################################################
+    def UpdateLaunchConfig(self, _xLaunch: CConfigLaunch):
+        self._xTrialAct = CTrialActions(_xLaunch)
+    # enddef
+
+    # ##################################c##########################################################
     def FromConfig(self, *, _pathGroup: Path, _prjX: CProject, _xLaunch: CConfigLaunch, _dicCfg: dict):
         self._iId = convert.DictElementToInt(_dicCfg, "iId")
 
