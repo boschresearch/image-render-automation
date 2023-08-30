@@ -28,7 +28,7 @@ from pathlib import Path
 from anybase import config, convert
 
 from ..api.cls_project import CProject
-from .cls_variant_launch import CVariantLaunch
+from .cls_variant_project import CVariantProject
 from .cls_variant_trial import CVariantTrial
 
 
@@ -67,16 +67,16 @@ class CVariantGroup:
         self._sGroup: str = None
 
         self._sInfo: str = None
-        self._iNextLaunchVarId: int = None
-        self._dicLaunchVariants: dict[int, CVariantLaunch] = None
+        self._iNextProjectVarId: int = None
+        self._dicProjectVariants: dict[int, CVariantProject] = None
 
         self._pathVariants.mkdir(parents=True, exist_ok=True)
 
     # enddef
 
     @property
-    def lLaunchVariantIds(self) -> list[int]:
-        return list(self._dicLaunchVariants.keys())
+    def lProjectVariantIds(self) -> list[int]:
+        return list(self._dicProjectVariants.keys())
 
     # enddef
 
@@ -96,22 +96,22 @@ class CVariantGroup:
         self._xProject = _prjX
         self._sGroup = _sGroup
         self._sInfo = convert.DictElementToString(_dicCfg, "sInfo", sDefault="")
-        self._iNextLaunchVarId = convert.DictElementToInt(_dicCfg, "iNextLaunchVarId")
+        self._iNextProjectVarId = convert.DictElementToInt(_dicCfg, "iNextProjectVarId")
 
-        self._dicLaunchVariants = {}
-        dicCfgLaunchVars = _dicCfg.get("mLaunchVariants")
-        if not isinstance(dicCfgLaunchVars, dict):
-            raise RuntimeError("Element 'mLaunchVariants' missing in variants group configuration")
+        self._dicProjectVariants = {}
+        dicCfgProjectVars = _dicCfg.get("mProjectVariants")
+        if not isinstance(dicCfgProjectVars, dict):
+            raise RuntimeError("Element 'mProjectVariants' missing in variants group configuration")
         # endif
 
-        sLaunchVarId: str = None
-        for sLaunchVarId in dicCfgLaunchVars:
-            iLaunchVarId: int = int(sLaunchVarId)
-            xVarLaunch = CVariantLaunch()
-            xVarLaunch.FromConfig(
-                _pathGroup=self._pathGroup, _prjX=self._xProject, _dicCfg=dicCfgLaunchVars[sLaunchVarId]
+        sProjectVarId: str = None
+        for sProjectVarId in dicCfgProjectVars:
+            iProjectVarId: int = int(sProjectVarId)
+            xVarProject = CVariantProject()
+            xVarProject.FromConfig(
+                _pathGroup=self._pathGroup, _prjX=self._xProject, _dicCfg=dicCfgProjectVars[sProjectVarId]
             )
-            self._dicLaunchVariants[iLaunchVarId] = xVarLaunch
+            self._dicProjectVariants[iProjectVarId] = xVarProject
         # endfor
 
     # enddef
@@ -128,52 +128,63 @@ class CVariantGroup:
         self._xProject = _prjX
         self._sGroup = _sGroup
         self._sInfo = _sInfo
-        self._iNextLaunchVarId = 1
-        self._dicLaunchVariants = {}
+        self._iNextProjectVarId = 1
+        self._dicProjectVariants = {}
 
-        self.AddLaunchVariant()
+        self.AddProjectVariant()
 
     # enddef
 
     # ############################################################################################
-    def AddLaunchVariant(self, *, _sInfo: str = "") -> int:
-        iId = self._iNextLaunchVarId
-        xVarLaunch = CVariantLaunch()
+    def AddProjectVariant(self, *, _sInfo: str = "") -> int:
+        iId = self._iNextProjectVarId
+        xVarLaunch = CVariantProject()
         xVarLaunch.Create(_iId=iId, _sInfo=_sInfo, _pathGroup=self._pathGroup, _prjX=self._xProject)
-        self._dicLaunchVariants[iId] = xVarLaunch
-        self._iNextLaunchVarId += 1
+        self._dicProjectVariants[iId] = xVarLaunch
+        self._iNextProjectVarId += 1
 
         return iId
 
     # enddef
 
     # ############################################################################################
-    def GetLaunchVariant(self, _iId: int):
-        return self._dicLaunchVariants.get(_iId)
+    def RemoveProjectVariant(self, _iId: int):
+        if _iId not in self._dicProjectVariants:
+            raise RuntimeError(f"Project variant id '{_iId}' not found")
+        # endif
+
+        self._dicProjectVariants[_iId].Destroy()
+        del self._dicProjectVariants[_iId]
+
+    # enddef
+
+    # ############################################################################################
+    def GetProjectVariant(self, _iId: int):
+        return self._dicProjectVariants.get(_iId)
 
     # enddef
 
     # ############################################################################################
     def UpdateFromSource(self, *, _bOverwrite: Optional[bool] = False):
-        for iLaunchVarId in self._dicLaunchVariants:
-            self._dicLaunchVariants[iLaunchVarId].UpdateFromSource(_bOverwrite=_bOverwrite)
+        for iProjectVarId in self._dicProjectVariants:
+            self._dicProjectVariants[iProjectVarId].UpdateFromSource(_bOverwrite=_bOverwrite)
         # endfor
 
     # enddef
 
     # ############################################################################################
     def Serialize(self) -> dict:
-        dicLaunchVars = {}
-        for iLaunchVarId in self._dicLaunchVariants:
-            dicLaunchVars[iLaunchVarId] = self._dicLaunchVariants[iLaunchVarId].Serialize()
+        dicProjectVars = {}
+        for iProjectVarId in self._dicProjectVariants:
+            dicProjectVars[iProjectVarId] = self._dicProjectVariants[iProjectVarId].Serialize()
         # endfor
 
         dicData = {
             "sDTI": "/catharsys/variants/group:1.0",
             "sName": self._sGroup,
             "sInfo": self._sInfo,
-            "iNextLaunchVarId": self._iNextLaunchVarId,
-            "mLaunchVariants": dicLaunchVars,
+            "iNextProjectVarId": self._iNextProjectVarId,
+            "mProjectVariants": dicProjectVars,
         }
 
         return dicData

@@ -29,7 +29,7 @@ from anybase import link as anylink
 from .cls_project import CProject
 from .cls_workspace import CWorkspace
 from ..config.cls_variant_group import CVariantGroup
-from ..config.cls_variant_launch import CVariantLaunch
+from ..config.cls_variant_project import CVariantProject
 from ..config.cls_variant_trial import CVariantTrial
 from ..config.cls_variant_instance import CVariantInstance
 from ..util import fsops
@@ -223,15 +223,15 @@ class CVariants:
 
     # ############################################################################################
     def CreateInstance(
-        self, *, _sGroup: str, _iLaunchId: int, _iTrialId: int, _dicMeta: dict[str, Any] = None
+        self, *, _sGroup: str, _iPrjVarId: int, _iTrialVarId: int, _dicMeta: dict[str, Any] = None
     ) -> CVariantInstance:
         xGroup: CVariantGroup = self.GetGroup(_sGroup)
-        xLaunch: CVariantLaunch = xGroup.GetLaunchVariant(_iLaunchId)
-        xTrial: CVariantTrial = xLaunch.GetTrialVariant(_iTrialId)
+        xPrjVar: CVariantProject = xGroup.GetProjectVariant(_iPrjVarId)
+        xTrialVar: CVariantTrial = xPrjVar.GetTrialVariant(_iTrialVarId)
 
         xInst = CVariantInstance(_pathInstances=self.pathInstances)
         xInst.Create(
-            _sPrjId=self.xProject.sId, _sGroup=_sGroup, _iLaunchId=_iLaunchId, _iTrialId=_iTrialId, _dicMeta=_dicMeta
+            _sPrjId=self.xProject.sId, _sGroup=_sGroup, _iPrjVarId=_iPrjVarId, _iTrialId=_iTrialVarId, _dicMeta=_dicMeta
         )
 
         lReExcludeDirs: list[str] = [r"^(\.|_).+"]
@@ -252,18 +252,16 @@ class CVariants:
         # endfor
 
         # Check whether launch file exists with one of the possible extensions
-        pathTrgFile = anypath.ProvideReadFilepathExt(
-            xInst.pathInstance / xLaunch.pathLaunchFile.stem, CVariants.c_lConfigSuffix, bDoRaise=False
-        )
-        if pathTrgFile is not None:
+        pathTrgFile = xInst.pathInstance / xPrjVar.sSrcLaunchFilename
+        if pathTrgFile.exists():
             pathTrgFile.unlink()
         # endif
 
         # Copy Variant launch file
-        fsops.CopyFileToDir(xLaunch.pathLaunchFile, xInst.pathInstance)
+        fsops.CopyFile(xPrjVar.pathLaunchFile, pathTrgFile)
 
         # Copy variant trial files
-        lSrcTrgPaths = xTrial.CreateVariantSourceTargetPaths(xInst.pathInstance)
+        lSrcTrgPaths = xTrialVar.CreateVariantSourceTargetPaths(xInst.pathInstance)
         sTrialBaseId = f"{self._xProject.xConfig.sLaunchFolderName}/{xInst.sName}"
         pathSrc: Path = None
         pathTrg: Path = None

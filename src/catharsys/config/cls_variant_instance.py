@@ -42,7 +42,7 @@ class CVariantInstance:
         self._pathInst: Path = None
         self._sPrjId: str = None
         self._sGroup: str = None
-        self._iLaunchId: int = None
+        self._iPrjVarId: int = None
         self._iTrialId: int = None
         self._sHash: str = None
         self._sTypeHash: str = None
@@ -59,7 +59,7 @@ class CVariantInstance:
 
     @property
     def iLaunchId(self) -> int:
-        return self._iLaunchId
+        return self._iPrjVarId
 
     # enddef
 
@@ -107,7 +107,7 @@ class CVariantInstance:
 
     @property
     def sName(self) -> str:
-        return f"{self._sGroup}-{self._iLaunchId}-{self._iTrialId}"
+        return f"{self._sGroup}-{self._iPrjVarId}-{self._iTrialId}"
 
     # enddef
 
@@ -167,7 +167,7 @@ class CVariantInstance:
             self._sHash = dicData["sHash"]
             self._sTypeHash = dicData["sTypeHash"]
             self._sGroup = dicData["sGroup"]
-            self._iLaunchId = dicData["iLaunchId"]
+            self._iPrjVarId = dicData["iPrjVarId"]
             self._iTrialId = dicData["iTrialId"]
             self._sPrjId = dicData["sPrjId"]
             self._dtCreated = datetime.strptime(dicData["sTimeCreated"], "%d %b %Y, %H:%M:%S.%f")
@@ -185,10 +185,10 @@ class CVariantInstance:
 
     # ############################################################################################
     def Create(
-        self, *, _sPrjId: str, _sGroup: str, _iLaunchId: int, _iTrialId: int, _dicMeta: Optional[dict[str, Any]] = None
+        self, *, _sPrjId: str, _sGroup: str, _iPrjVarId: int, _iTrialId: int, _dicMeta: Optional[dict[str, Any]] = None
     ) -> "CVariantInstance":
         self._sGroup = _sGroup
-        self._iLaunchId = _iLaunchId
+        self._iPrjVarId = _iPrjVarId
         self._iTrialId = _iTrialId
         self._sPrjId = _sPrjId
         self._dtCreated = datetime.now()
@@ -205,7 +205,7 @@ class CVariantInstance:
             raise CAnyError_Message(sMsg="Variant instance meta data must be json serializable", xChildEx=xEx)
         # endtry
 
-        sData = f"{self._sGroup}-{self._sPrjId}-{self._iLaunchId}-{self._iTrialId}:{sMeta}"
+        sData = f"{self._sGroup}-{self._sPrjId}-{self._iPrjVarId}-{self._iTrialId}:{sMeta}"
         self._sTypeHash = hashlib.md5(sData.encode("utf-8")).hexdigest()
 
         sData = f"{self._sTypeHash}:{self.sTimeCreated}"
@@ -241,7 +241,7 @@ class CVariantInstance:
                 "sHash": self._sHash,
                 "sTypeHash": self._sTypeHash,
                 "sGroup": self._sGroup,
-                "iLaunchId": self._iLaunchId,
+                "iPrjVarId": self._iPrjVarId,
                 "iTrialId": self._iTrialId,
                 "sPrjId": self._sPrjId,
                 "sTimeCreated": self.sTimeCreated,
@@ -250,7 +250,7 @@ class CVariantInstance:
             config.Save(self.pathInstanceConfig, dicData, sDTI="/catharsys/variant/instance:1.0")
         except Exception as xEx:
             raise CAnyError_Message(
-                sMsg=f"Error serializing variant instance: {self._sGroup}, {self._iLaunchId}, {self._iTrialId}",
+                sMsg=f"Error serializing variant instance: {self._sGroup}, {self._iPrjVarId}, {self._iTrialId}",
                 xChildEx=xEx,
             )
         # endtry

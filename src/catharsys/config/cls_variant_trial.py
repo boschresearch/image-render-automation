@@ -36,11 +36,24 @@ from ..api.cls_project import CProject
 from ..api.cls_workspace import CWorkspace
 from .cls_trial_actions import CTrialActions
 from .cls_launch import CConfigLaunch
+from ..util import fsops
 
 
 # #####################################################################################
 class CVariantTrial:
     def __init__(self):
+        self._Clear()
+
+    # enddef
+
+    @property
+    def xTrialActions(self) -> CTrialActions:
+        return self._xTrialAct
+
+    # enddef
+
+    # ##################################c##########################################################
+    def _Clear(self):
         self._iId: int = None
         self._sInfo: str = None
         self._pathGroup: Path = None
@@ -52,16 +65,10 @@ class CVariantTrial:
 
     # enddef
 
-    @property
-    def xTrialActions(self) -> CTrialActions:
-        return self._xTrialAct
-
-    # enddef
-
-
     # ##################################c##########################################################
     def UpdateLaunchConfig(self, _xLaunch: CConfigLaunch):
         self._xTrialAct = CTrialActions(_xLaunch)
+
     # enddef
 
     # ##################################c##########################################################
@@ -111,6 +118,15 @@ class CVariantTrial:
         for sTrialFile in self._xTrialAct.lTrialFiles:
             self.AddFileConfig(sTrialFile)
         # endfor
+
+    # enddef
+
+    # ############################################################################################
+    def Destroy(self):
+        if isinstance(self._pathVariant, Path) and self._pathVariant.exists():
+            fsops.RemoveTree(self._pathVariant, bIgnoreErrors=True)
+        # endif
+        self._Clear()
 
     # enddef
 

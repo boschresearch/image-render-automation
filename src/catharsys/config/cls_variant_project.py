@@ -38,11 +38,17 @@ from ..api.cls_project import CProject
 # from ..config.cls_launch import CConfigLaunch
 from .cls_variant_trial import CVariantTrial
 from .cls_launch import CConfigLaunch
+from ..util import fsops
 
 
 # #####################################################################################
-class CVariantLaunch:
+class CVariantProject:
     def __init__(self):
+        self._Clear()
+
+    # enddef
+
+    def _Clear(self):
         self._pathGroup: Path = None
         self._pathVariant: Path = None
 
@@ -53,7 +59,7 @@ class CVariantLaunch:
         self._sLaunchFileStem: str = None
         self._setLaunchFileIds: set[int] = None
         self._iSelectedLaunchFileId: int = None
-        self._iNextLaunchFileId: int = 1
+        self._iNextLaunchFileId: int = None
 
         self._iId: int = None
         self._sInfo: str = None
@@ -99,6 +105,12 @@ class CVariantLaunch:
 
     # enddef
 
+    @property
+    def sSrcLaunchFilename(self) -> str:
+        return self._sSrcLaunchFilename
+
+    # enddef
+
     # ############################################################################################
     def GetLaunchFilename(self, _iId: int) -> str:
         return f"{self._sLaunchFileStem}-{_iId}.json"
@@ -119,6 +131,11 @@ class CVariantLaunch:
 
     # ############################################################################################
     def FromConfig(self, *, _pathGroup: Path, _prjX: CProject, _dicCfg: dict):
+        dicDti = config.CheckConfigType(_dicCfg, "/catharsys/variants/project:1")
+        if dicDti["bOK"] is False:
+            raise RuntimeError("Variant configuration type not supported")
+        # endif
+
         self._iId = convert.DictElementToInt(_dicCfg, "iId")
 
         pathVariant: Path = _pathGroup / f"lv-{self._iId}"
@@ -166,7 +183,7 @@ class CVariantLaunch:
     def Create(self, *, _iId: int, _sInfo: str, _pathGroup: Path, _prjX: CProject):
         pathVariant: Path = _pathGroup / f"lv-{_iId}"
         if pathVariant.exists():
-            raise RuntimeError(f"Launch variant path already exists: {(pathVariant.as_posix())}")
+            raise RuntimeError(f"Project variant path already exists: {(pathVariant.as_posix())}")
         # endif
         self._pathVariant = pathVariant
         self._pathVariant.mkdir(parents=True)
@@ -175,10 +192,13 @@ class CVariantLaunch:
         self._sInfo = _sInfo
         self._pathGroup = _pathGroup
         self._xProject = _prjX
+
+        self._iNextLaunchFileId = 1
         pathSrcLaunchFile = self._xProject.xConfig.pathLaunchFile
         self._sSrcLaunchFilename = pathSrcLaunchFile.name
         self._sLaunchFileStem = pathSrcLaunchFile.stem
-        self._setLaunchFileIds.add(self._iNextLaunchFileId)
+        self._setLaunchFileIds = set([self._iNextLaunchFileId])
+
         self._iSelectedLaunchFileId = self._iNextLaunchFileId
         self._iNextLaunchFileId += 1
         self._dicTrialVariants = {}
@@ -191,6 +211,15 @@ class CVariantLaunch:
         # shutil.copyfile(pathSrcLaunchFile.as_posix(), self._pathLaunchFile.as_posix())
 
         self.AddTrialVariant()
+
+    # enddef
+
+    # ############################################################################################
+    def Destroy(self):
+        if isinstance(self._pathVariant, Path) and self._pathVariant.exists():
+            fsops.RemoveTree(self._pathVariant, bIgnoreErrors=True)
+        # endif
+        self._Clear()
 
     # enddef
 
@@ -269,6 +298,17 @@ class CVariantLaunch:
     # enddef
 
     # ############################################################################################
+    def RemoveTrialVariant(self, _iId: int):
+        if _iId not in self._dicTrialVariants:
+            raise RuntimeError(f"Trial variant id '{_iId}' not found")
+        # endif
+
+        self._dicTrialVariants[_iId].Destroy()
+        del self._dicTrialVariants[_iId]
+
+    # enddef
+
+    # ############################################################################################
     def GetTrialVariant(self, _iId: int) -> CVariantTrial:
         return self._dicTrialVariants.get(_iId)
 
@@ -307,7 +347,7 @@ class CVariantLaunch:
         # endfor
 
         dicData = {
-            "sDTI": "/catharsys/variants/launch:1.0",
+            "sDTI": "/catharsys/variants/project:1.0",
             "iId": self._iId,
             "sInfo": self._sInfo,
             "iNextTrialVarId": self._iNextTrialVarId,
