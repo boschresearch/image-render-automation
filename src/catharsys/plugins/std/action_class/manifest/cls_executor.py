@@ -755,7 +755,12 @@ class CActionClassManifestExecutor(CActionClassExecutor):
                     print(f"Finished job: {sName}")
                     futJob.result()
                 except Exception as xEx:
-                    print(f"Exception running job:\n{(str(xEx))}")
+                    sMsg = f"Exception running job:\n{(str(xEx))}"
+                    xProcHander: CProcessHandler = dicArgs["xProcessHandler"]
+                    if xProcHander is not None and xProcHander.bEndedAvailable is True:
+                        xProcHander.Ended(1, sMsg)
+                    # endif
+                    print(sMsg)
                 # endtry
             # endfor
 

@@ -60,6 +60,7 @@ class CVariantProject:
         self._setLaunchFileIds: set[int] = None
         self._iSelectedLaunchFileId: int = None
         self._iNextLaunchFileId: int = None
+        self._dicLaunchFileInfo: dict[int, str] = None
 
         self._iId: int = None
         self._sInfo: str = None
@@ -90,6 +91,12 @@ class CVariantProject:
     @property
     def setLaunchFileIds(self) -> set[int]:
         return self._setLaunchFileIds.copy()
+
+    # enddef
+
+    @property
+    def dicLaunchFileInfo(self) -> dict[int, str]:
+        return self._dicLaunchFileInfo
 
     # enddef
 
@@ -224,7 +231,7 @@ class CVariantProject:
     # enddef
 
     # ############################################################################################
-    def AddLaunchFileVariant(self, *, _bSelect: bool = False, _bCopyCurrent: bool = True) -> int:
+    def AddLaunchFileVariant(self, *, _bSelect: bool = False, _bCopyCurrent: bool = True, _sInfo: str = "") -> int:
         self._setLaunchFileIds.add(self._iNextLaunchFileId)
         iNewId: int = self._iNextLaunchFileId
         self._iNextLaunchFileId += 1
@@ -237,6 +244,8 @@ class CVariantProject:
 
         pathNewLaunch = self.GetPathLaunchFile(iNewId)
         config.Save(pathNewLaunch, dicLaunch)
+
+        self._dicLaunchFileInfo[iNewId] = _sInfo
 
         if _bSelect is True:
             self.SelectLaunchFileVariant(iNewId)
@@ -259,6 +268,7 @@ class CVariantProject:
         pathLaunchFile = self.GetPathLaunchFile(_iId)
         pathLaunchFile.unlink(missing_ok=True)
         self._setLaunchFileIds.discard(_iId)
+        del self._dicLaunchFileInfo[_iId]
 
         if self._iSelectedLaunchFileId == _iId:
             iNewId = next((x for x in self._setLaunchFileIds))
