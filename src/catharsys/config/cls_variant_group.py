@@ -25,11 +25,12 @@ import re
 from typing import Optional
 
 from pathlib import Path
-from anybase import config, convert
+from anybase import convert
 
 from ..api.cls_project import CProject
 from .cls_variant_project import CVariantProject
-from .cls_variant_trial import CVariantTrial
+
+# from .cls_variant_trial import CVariantTrial
 
 
 # #####################################################################################
@@ -71,6 +72,18 @@ class CVariantGroup:
         self._dicProjectVariants: dict[int, CVariantProject] = None
 
         self._pathVariants.mkdir(parents=True, exist_ok=True)
+
+    # enddef
+
+    @property
+    def xProject(self) -> CProject:
+        return self._xProject
+
+    # enddef
+
+    @property
+    def sGroup(self) -> str:
+        return self._sGroup
 
     # enddef
 
