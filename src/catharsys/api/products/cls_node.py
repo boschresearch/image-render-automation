@@ -86,6 +86,18 @@ class CNode(anytree.NodeMixin):
     # enddef
 
     @property
+    def iLevel(self) -> int:
+        return self._iLevel
+
+    # enddef
+
+    @property
+    def eType(self) -> ENodeType:
+        return self._eType
+
+    # enddef
+
+    @property
     def xGroupNode(self) -> "CNode":
         return next((node for node in self.path if node._eType == ENodeType.GROUP), None)
 

@@ -66,6 +66,18 @@ class CGroup:
 
     # enddef
 
+    @property
+    def xPathStruct(self) -> CPathStructure:
+        return self._xPathStruct
+
+    # enddef
+
+    @property
+    def dicArtTypes(self) -> dict[str, CArtefactType]:
+        return self._dicArtTypes
+
+    # enddef
+
     # ######################################################################################################
     def FromConfig(self, _dicCfg: dict):
         self._sName = _dicCfg.get("sName", self._sId)
@@ -118,15 +130,34 @@ class CGroup:
 
         iMaxGroupLevel: int = self._xPathStruct.iMaxLevel
 
+        # Prune nodes that are leaves but not at max group level
+        tGroupLeafNodes: tuple[CNode] = tuple()
+        xNode: CNode = None
+        while True:
+            tGroupLeafNodes: tuple[CNode] = tuple(
+                anytree.PreOrderIter(
+                    self._xTree, filter_=lambda xNode: xNode.is_leaf and xNode._iLevel < iMaxGroupLevel
+                )
+            )
+            if len(tGroupLeafNodes) == 0:
+                break
+            # endif
+
+            for xNode in tGroupLeafNodes:
+                xNode.parent = None
+            # endfor
+        # endwhile
+        del tGroupLeafNodes
+        del xNode
+
+        tGroupLeafNodes: tuple[CNode] = tuple(anytree.PreOrderIter(self._xTree, filter_=lambda node: node.is_leaf))
+
         # Scan all artefact types
         sArtTypeId: str = ""
         for sArtTypeId in self._dicArtTypes:
             xArtType: CArtefactType = self._dicArtTypes[sArtTypeId]
             xNode: CNode = None
-            tNodes: tuple[CNode] = tuple(
-                anytree.PreOrderIter(self._xTree, filter_=lambda node: node.is_leaf and node._iLevel == iMaxGroupLevel)
-            )
-            for xNode in tNodes:
+            for xNode in tGroupLeafNodes:
                 xArtTypeNode = CNode(sArtTypeId, parent=xNode, _iLevel=0, _eType=ENodeType.ARTGROUP, _xData=xArtType)
                 xArtType.xPathStruct.ScanFileSystem(
                     _pathScan=xNode.pathFS,
@@ -140,8 +171,134 @@ class CGroup:
     # enddef
 
     # ######################################################################################################
-    def GetVarValueLists(self) -> list[list[str]]:
-        return [[node.name for node in group] for group in anytree.LevelGroupOrderIter(self._xTree)]
+    def _GetVarValueSets(self, *, _xNode: CNode, _iMaxLevel: int) -> list[list[str]]:
+        lVarValueSets: list[set[str]] = [
+            set([node.name for node in group]) for group in anytree.LevelGroupOrderIter(_xNode, maxlevel=_iMaxLevel)
+        ]
+        return lVarValueSets
+
+    # enddef
+
+    # ######################################################################################################
+    def _GetVarValueLists(self, *, _xNode: CNode, _iMaxLevel: int) -> list[list[str]]:
+        lVarValueSets = self._GetVarValueSets(_xNode=_xNode, _iMaxLevel=_iMaxLevel)
+
+        lVarValues = [list(x) for x in lVarValueSets[1:]]
+        for lX in lVarValues:
+            lX.sort()
+        # endfor
+
+        return lVarValues
+
+    # enddef
+
+    # ######################################################################################################
+    def GetGroupVarValueLists(self) -> list[list[str]]:
+        iGroupVarCnt: int = self._xPathStruct.iPathVarCount
+        return self._GetVarValueLists(_xNode=self._xTree, _iMaxLevel=iGroupVarCnt + 1)
+
+    # enddef
+
+    # ######################################################################################################
+    def GetGroupVarNodeList(self, _lGroupVarValueSelLists: list[list[str]]) -> list[CNode]:
+        iGroupVarCnt: int = self._xPathStruct.iPathVarCount
+        if len(_lGroupVarValueSelLists) != iGroupVarCnt:
+            raise RuntimeError(f"The group variable value selection list must have {iGroupVarCnt} elements")
+        # endif
+
+        # Find those group leaf nodes whose path satisfies the group variable value selections
+        lValues: list[str] = None
+        lNodes: list[CNode] = [self._xTree]
+        for lValues in _lGroupVarValueSelLists:
+            lChildNodes: list[CNode] = []
+            if len(lValues) == 1 and lValues[0] == "*":
+                for xNode in lNodes:
+                    lChildNodes.extend(list(xNode.children))
+                # endfor
+            else:
+                setValues = set(lValues)
+                for xNode in lNodes:
+                    lChildNodes.extend([xChild for xChild in xNode.children if xChild.name in setValues])
+                # endfor
+            # endfor
+            lNodes = lChildNodes
+        # endfor
+
+        return lNodes
+
+    # enddef
+
+    # ######################################################################################################
+    def GetArtefactVarValues(self, _lGroupVarValueSelLists: list[list[str]]) -> dict[str, list[list[str]]]:
+        lNodes = self.GetGroupVarNodeList(_lGroupVarValueSelLists)
+
+        dicArtVarValueSets: dict[str, list[set[str]]] = dict()
+        for xNode in lNodes:
+            for xChild in xNode.children:
+                sArtType: str = str(xChild.name)
+                iPathVarCount: int = self._dicArtTypes[sArtType].xPathStruct.iPathVarCount
+                lValueSets = self._GetVarValueSets(_xNode=xChild, _iMaxLevel=iPathVarCount + 1)[1:]
+                # if there are no artefacts for a child, then ignore the whole path var list
+                if len(lValueSets) < iPathVarCount:
+                    continue
+                # endif
+
+                xArtVarValues: list[str] = dicArtVarValueSets.get(sArtType)
+                if xArtVarValues is None:
+                    dicArtVarValueSets[sArtType] = lValueSets
+                else:
+                    for iIdx, setValues in enumerate(dicArtVarValueSets[sArtType]):
+                        setValues.union(lValueSets[iIdx])
+                    # endfor
+                # endif
+            # endfor children
+        # endfor nodes
+
+        # Make sets to lists
+        dicArtVarValueLists: dict[str, list[list[str]]] = dict()
+        sArtType: str = None
+        lValueSets: list[set[str]] = None
+        for sArtType, lValueSets in dicArtVarValueSets.items():
+            lValueLists = [list(x) for x in lValueSets]
+            for lValues in lValueLists:
+                lValues.sort()
+            # endfor
+            dicArtVarValueLists[sArtType] = lValueLists
+        # endfor
+
+        return dicArtVarValueLists
+
+    # enddef
+
+    # ######################################################################################################
+    def GetGroupVarNode(self, _lGrpPath: list[str]) -> CNode:
+        xNode: CNode = self._xTree
+        for sName in _lGrpPath:
+            xNode = next((xChild for xChild in xNode.children if xChild.name == sName), None)
+            if xNode is None:
+                return None
+            # endif
+        # endfor
+        return xNode
+
+    # enddef
+
+    # ######################################################################################################
+    def GetArtVarNode(self, *, _xNode: CNode, _sArtType: str, _lArtPath: list[str]) -> CNode:
+        xNode = next((xChild for xChild in _xNode.children if xChild.name == _sArtType), None)
+        if xNode is None:
+            return None
+        # endif
+
+        for sName in _lArtPath:
+            xNode = next((xChild for xChild in xNode.children if xChild.name == sName), None)
+            if xNode is None:
+                return None
+            # endif
+        # endfor
+        return xNode
+
+    # enddef
 
     # enddef
 

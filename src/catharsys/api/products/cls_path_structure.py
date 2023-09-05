@@ -89,6 +89,12 @@ class CPathStructure:
     # enddef
 
     @property
+    def iPathVarCount(self) -> int:
+        return len(self._lPathVars)
+
+    # enddef
+
+    @property
     def iMaxLevel(self) -> int:
         return len(self._lPathVars) - 1
 
