@@ -229,7 +229,9 @@ class CGroup:
     # enddef
 
     # ######################################################################################################
-    def GetArtefactVarValues(self, _lGroupVarValueSelLists: list[list[str]]) -> dict[str, list[list[str]]]:
+    def GetArtefactVarValues(
+        self, _lGroupVarValueSelLists: list[list[str]], *, _bSameVarValueUnion: bool = True
+    ) -> tuple[dict[str, list[list[str]]], dict[str, list[str]]]:
         lNodes = self.GetGroupVarNodeList(_lGroupVarValueSelLists)
 
         dicArtVarValueSets: dict[str, list[set[str]]] = dict()
@@ -248,13 +250,58 @@ class CGroup:
                     dicArtVarValueSets[sArtType] = lValueSets
                 else:
                     for iIdx, setValues in enumerate(dicArtVarValueSets[sArtType]):
-                        setValues.union(lValueSets[iIdx])
+                        setValues = setValues.union(lValueSets[iIdx])
                     # endfor
                 # endif
             # endfor children
         # endfor nodes
 
-        # Make sets to lists
+        # Create dictionary of list of artefact types per variable is
+        dicArtVarsTypeList: dict[str, list[str]] = dict()
+        for sArtType, xArtType in self._dicArtTypes.items():
+            for sArtVarId in xArtType.xPathStruct.lPathVarIds:
+                lArtTypes: list[str] = dicArtVarsTypeList.get(sArtVarId)
+                if lArtTypes is None:
+                    dicArtVarsTypeList[sArtVarId] = [sArtType]
+                else:
+                    lArtTypes.append(sArtType)
+                # endif
+            # endfor
+        # endfor
+
+        # Create union of values for same variables in different artefact types, e.g. frames
+        if _bSameVarValueUnion is True:
+            # Make union of common variables from different types
+            dicArtVarValueLists: dict[str, list[list[str]]] = dict()
+            sArtType: str = None
+            lValueSets: list[set[str]] = None
+            for sArtVarId, lArtTypes in dicArtVarsTypeList.items():
+                # if a variable appears in only one artefact type,
+                # the we do not need to create a union of all values.
+                if len(lArtTypes) <= 1:
+                    continue
+                # endif
+
+                # Create union of value sets for variable over all artefact types
+                setValues = set()
+                for sArtType in lArtTypes:
+                    lArtVarIds = self._dicArtTypes[sArtType].xPathStruct.lPathVarIds
+                    lValueSets = dicArtVarValueSets[sArtType]
+                    iArtVarIdx = lArtVarIds.index(sArtVarId)
+                    setValues = setValues.union(lValueSets[iArtVarIdx])
+                # endfor
+
+                # Set union of values
+                for sArtType in lArtTypes:
+                    lArtVarIds = self._dicArtTypes[sArtType].xPathStruct.lPathVarIds
+                    lValueSets = dicArtVarValueSets[sArtType]
+                    iArtVarIdx = lArtVarIds.index(sArtVarId)
+                    lValueSets[iArtVarIdx] = setValues
+                # endfor
+            # endfor
+        # endif
+
+        # Make values sets to sorted lists
         dicArtVarValueLists: dict[str, list[list[str]]] = dict()
         sArtType: str = None
         lValueSets: list[set[str]] = None
@@ -266,7 +313,7 @@ class CGroup:
             dicArtVarValueLists[sArtType] = lValueLists
         # endfor
 
-        return dicArtVarValueLists
+        return dicArtVarValueLists, dicArtVarsTypeList
 
     # enddef
 
