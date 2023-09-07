@@ -67,6 +67,8 @@ class CProducts:
                 eType=EPathVarType.SYSTEM,
                 eNodeType=ENodeType.PATH,
                 funcHandler=self._OnVarRq,
+                sReParseValue=r"rq[0]*(\d+)",
+                sReReplaceValue=r"\1",
             ),
             "project": CPathVar(
                 sId="project",
@@ -81,6 +83,8 @@ class CProducts:
                 eType=EPathVarType.SYSTEM,
                 eNodeType=ENodeType.ARTEFACT,
                 funcHandler=self._OnVarFrame,
+                sReParseValue=r"Frame_[0]*(\d+)\..+",
+                sReReplaceValue=r"\1",
             ),
         }
 

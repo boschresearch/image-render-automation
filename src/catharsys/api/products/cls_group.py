@@ -20,6 +20,7 @@
 # </LICENSE>
 ###
 
+import re
 from pathlib import Path
 from dataclasses import dataclass
 import anytree
@@ -172,6 +173,7 @@ class CGroup:
 
     # ######################################################################################################
     def _GetVarValueSets(self, *, _xNode: CNode, _iMaxLevel: int) -> list[list[str]]:
+        node: CNode
         lVarValueSets: list[set[str]] = [
             set([node.name for node in group]) for group in anytree.LevelGroupOrderIter(_xNode, maxlevel=_iMaxLevel)
         ]
@@ -193,9 +195,36 @@ class CGroup:
     # enddef
 
     # ######################################################################################################
+    def _GetVarLabelLists(self, *, _lVarValueLists: list[list[str]], _xPathStruct: CPathStructure) -> list[list[str]]:
+        lVarLabelLists: list[list[str]] = []
+        for sVarId, lVarValues in zip(_xPathStruct.lPathVarIds, _lVarValueLists):
+            lVarLabel: list[str] = []
+            xVar: CPathVar = _xPathStruct.dicVars[sVarId]
+            if xVar.sReParseValue is None or xVar.sReReplaceValue is None:
+                lVarLabel = lVarValues
+            else:
+                for sVarValue in lVarValues:
+                    sLabel = re.sub(xVar.sReParseValue, xVar.sReReplaceValue, sVarValue)
+                    lVarLabel.append(sLabel)
+                # endfor
+            # endif
+            lVarLabelLists.append(lVarLabel)
+        # endfor
+
+        return lVarLabelLists
+
+    # enddef
+
+    # ######################################################################################################
     def GetGroupVarValueLists(self) -> list[list[str]]:
         iGroupVarCnt: int = self._xPathStruct.iPathVarCount
         return self._GetVarValueLists(_xNode=self._xTree, _iMaxLevel=iGroupVarCnt + 1)
+
+    # enddef
+
+    # ######################################################################################################
+    def GetGroupVarLabelLists(self, _lGrpVarValueLists: list[list[str]]) -> list[list[str]]:
+        return self._GetVarLabelLists(_lVarValueLists=_lGrpVarValueLists, _xPathStruct=self._xPathStruct)
 
     # enddef
 
@@ -245,7 +274,7 @@ class CGroup:
                     continue
                 # endif
 
-                xArtVarValues: list[str] = dicArtVarValueSets.get(sArtType)
+                xArtVarValues: list[set[str]] = dicArtVarValueSets.get(sArtType)
                 if xArtVarValues is None:
                     dicArtVarValueSets[sArtType] = lValueSets
                 else:
@@ -256,9 +285,13 @@ class CGroup:
             # endfor children
         # endfor nodes
 
-        # Create dictionary of list of artefact types per variable is
+        # Create dictionary of list of artefact types per variable
         dicArtVarsTypeList: dict[str, list[str]] = dict()
         for sArtType, xArtType in self._dicArtTypes.items():
+            if sArtType not in dicArtVarValueSets:
+                continue
+            # endif
+            
             for sArtVarId in xArtType.xPathStruct.lPathVarIds:
                 lArtTypes: list[str] = dicArtVarsTypeList.get(sArtVarId)
                 if lArtTypes is None:
@@ -314,6 +347,19 @@ class CGroup:
         # endfor
 
         return dicArtVarValueLists, dicArtVarsTypeList
+
+    # enddef
+
+    # ######################################################################################################
+    def GetArtefactVarLabels(self, _dicArtVarValueLists: dict[str, list[list[str]]]) -> dict[str, list[list[str]]]:
+        dicArtVarLabelLists: dict[str, list[list[str]]] = dict()
+        for sArtTypeId, lArtValueLists in _dicArtVarValueLists.items():
+            xArtType: CArtefactType = self._dicArtTypes[sArtTypeId]
+            dicArtVarLabelLists[sArtTypeId] = self._GetVarLabelLists(
+                _lVarValueLists=lArtValueLists, _xPathStruct=xArtType.xPathStruct
+            )
+        # endfor
+        return dicArtVarLabelLists
 
     # enddef
 

@@ -55,6 +55,8 @@ class CPathVar:
     eType: EPathVarType
     eNodeType: ENodeType
     funcHandler: Callable[[Path], Iterator[CPathVarHandlerResult]] = None
+    sReParseValue: str = None
+    sReReplaceValue: str = None
 
 
 # endclass
