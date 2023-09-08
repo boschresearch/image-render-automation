@@ -267,8 +267,8 @@ class CVariantInstance:
     # enddef
 
     # ############################################################################################
-    def GetProject(self) -> CProject:
-        return CProject(self.GetProjectConfig())
+    def GetProject(self, *, xWorkspace=None) -> CProject:
+        return CProject(self.GetProjectConfig(), xWorkspace=xWorkspace)
 
     # enddef
 

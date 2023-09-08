@@ -68,6 +68,12 @@ class CGroup:
     # enddef
 
     @property
+    def bHasData(self) -> bool:
+        return len(self._xTree.children) > 0
+
+    # enddef
+
+    @property
     def xPathStruct(self) -> CPathStructure:
         return self._xPathStruct
 
@@ -140,7 +146,8 @@ class CGroup:
                     self._xTree, filter_=lambda xNode: xNode.is_leaf and xNode._iLevel < iMaxGroupLevel
                 )
             )
-            if len(tGroupLeafNodes) == 0:
+
+            if len(tGroupLeafNodes) == 0 or len(self._xTree.children) == 0:
                 break
             # endif
 
@@ -150,6 +157,10 @@ class CGroup:
         # endwhile
         del tGroupLeafNodes
         del xNode
+
+        if len(self._xTree.children) == 0:
+            return
+        # endif
 
         tGroupLeafNodes: tuple[CNode] = tuple(anytree.PreOrderIter(self._xTree, filter_=lambda node: node.is_leaf))
 
@@ -291,7 +302,7 @@ class CGroup:
             if sArtType not in dicArtVarValueSets:
                 continue
             # endif
-            
+
             for sArtVarId in xArtType.xPathStruct.lPathVarIds:
                 lArtTypes: list[str] = dicArtVarsTypeList.get(sArtVarId)
                 if lArtTypes is None:

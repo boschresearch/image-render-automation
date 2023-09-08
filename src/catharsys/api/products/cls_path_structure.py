@@ -153,6 +153,8 @@ class CPathStructure:
         sPathVarId: str = lPathVarIds[_iLevel]
         xPathVar: CPathVar = self.dicVars[sPathVarId]
 
+        # print(f"{sPathVarId} in {_pathScan}")
+
         if xPathVar.eType == EPathVarType.SYSTEM:
             if xPathVar.funcHandler is not None:
                 xResult: CPathVarHandlerResult = None

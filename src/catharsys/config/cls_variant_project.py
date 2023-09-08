@@ -60,7 +60,7 @@ class CVariantProject:
         self._setLaunchFileIds: set[int] = None
         self._iSelectedLaunchFileId: int = None
         self._iNextLaunchFileId: int = None
-        self._dicLaunchFileInfo: dict[int, str] = None
+        self._dicLaunchFileInfo: dict[int, str] = dict()
 
         self._iId: int = None
         self._sInfo: str = None
