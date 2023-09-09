@@ -123,7 +123,7 @@ class CPathStructure:
                 self._dicVars[sVarId] = self._dicSystemVars[sVarId]
 
             elif sItem.startswith("?"):
-                sVarId = sItem[1:-1]
+                sVarId = sItem[1:]
                 if isinstance(_dicUserVars, dict) and sVarId in _dicUserVars:
                     self._dicVars[sVarId] = CPathVar(
                         sId=sVarId,
