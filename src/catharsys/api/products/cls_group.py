@@ -274,6 +274,8 @@ class CGroup:
     ) -> tuple[dict[str, list[list[str]]], dict[str, list[str]]]:
         lNodes = self.GetGroupVarNodeList(_lGroupVarValueSelLists)
 
+        # Create a union over all artefact values of the same type,
+        # for different groups paths, e.g. different cameras.
         dicArtVarValueSets: dict[str, list[set[str]]] = dict()
         for xNode in lNodes:
             for xChild in xNode.children:
@@ -321,7 +323,7 @@ class CGroup:
             lValueSets: list[set[str]] = None
             for sArtVarId, lArtTypes in dicArtVarsTypeList.items():
                 # if a variable appears in only one artefact type,
-                # the we do not need to create a union of all values.
+                # we do not need to create a union of all values.
                 if len(lArtTypes) <= 1:
                     continue
                 # endif
