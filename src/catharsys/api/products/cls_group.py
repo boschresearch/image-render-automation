@@ -287,16 +287,21 @@ class CGroup:
                     continue
                 # endif
 
-                xArtVarValues: list[set[str]] = dicArtVarValueSets.get(sArtType)
-                if xArtVarValues is None:
+                lArtVarValues: list[set[str]] = dicArtVarValueSets.get(sArtType)
+                # print(f"sArtType, lArtVarValues: {sArtType}, {lArtVarValues}")
+                # print(f"lValueSets: {lValueSets}")
+
+                if lArtVarValues is None:
                     dicArtVarValueSets[sArtType] = lValueSets
                 else:
-                    for iIdx, setValues in enumerate(dicArtVarValueSets[sArtType]):
-                        setValues = setValues.union(lValueSets[iIdx])
+                    for iIdx, setValues in enumerate(lArtVarValues):
+                        setValues.update(lValueSets[iIdx])
                     # endfor
                 # endif
             # endfor children
         # endfor nodes
+
+        # print(f"dicArtVarValueSets: {dicArtVarValueSets}")
 
         # Create dictionary of list of artefact types per variable
         dicArtVarsTypeList: dict[str, list[str]] = dict()

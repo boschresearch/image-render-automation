@@ -58,7 +58,7 @@ class CVariantInstance:
     # enddef
 
     @property
-    def iLaunchId(self) -> int:
+    def iPrjVarId(self) -> int:
         return self._iPrjVarId
 
     # enddef

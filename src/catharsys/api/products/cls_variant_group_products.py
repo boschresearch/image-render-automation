@@ -48,6 +48,11 @@ class CVariantGroupProducts(CProducts):
 
     # enddef
 
+    @property
+    def xVariantGroup(self) -> CVariantGroup:
+        return self._xVarGrp
+    # enddef
+
     # ######################################################################################################
     def _OnVarVariant(self, _pathScan: Path) -> Iterator[CPathVarHandlerResult]:
         if _pathScan is None:
