@@ -96,6 +96,18 @@ class CProducts:
 
     # enddef
 
+    @property
+    def lGroups(self) -> list[str]:
+        return list(self._dicGroups.keys())
+
+    # enddef
+
+    @property
+    def iGroupCount(self) -> int:
+        return len(self._dicGroups)
+
+    # enddef
+
     # #####################################################################################################
     def FromFile(self, _pathConfig: Path):
         self._dicCfg = config.Load(_pathConfig, sDTI="/catharsys/production:1")
