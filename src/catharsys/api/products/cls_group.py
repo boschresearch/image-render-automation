@@ -30,7 +30,7 @@ from catharsys.api.cls_project import CProject
 from anybase import config
 
 from .cls_node import CNode, ENodeType
-from .cls_path_structure import CPathStructure, CPathVar
+from .cls_path_structure import CPathStructure, CPathVar, EPathVarType
 
 
 @dataclass
@@ -39,6 +39,7 @@ class CArtefactType:
     sName: str = None
     lType: list[str] = None
     xPathStruct: CPathStructure = None
+    dicMeta: dict = None
 
 
 # endclass
@@ -58,6 +59,8 @@ class CGroup:
         else:
             self._dicPathSystemVars = {}
         # endf
+
+        self._dicVarValues: dict[str, str] = dict()
 
     # enddef
 
@@ -85,8 +88,16 @@ class CGroup:
 
     # enddef
 
+    @property
+    def dicVarValues(self) -> dict[str, str]:
+        return self._dicVarValues
+
+    # enddef
+
     # ######################################################################################################
     def FromConfig(self, _dicCfg: dict):
+        self._dicVarValues = dict()
+
         self._sName = _dicCfg.get("sName", self._sId)
         self._xPathStruct = CPathStructure(
             _dicCfg["sPathStructure"],
@@ -94,6 +105,12 @@ class CGroup:
             _eLastElementNodeType=ENodeType.PATH,
             _dicSystemVars=self._dicPathSystemVars,
         )
+
+        for sVarId, xPathVar in self._xPathStruct.dicVars.items():
+            if xPathVar.eType != EPathVarType.FIXED:
+                self._dicVarValues[sVarId] = ""
+            # endif
+        # endfor
 
         self._dicArtTypes = dict()
         dicArtefacts = _dicCfg.get("mArtefacts")
@@ -119,7 +136,15 @@ class CGroup:
                 _eLastElementNodeType=ENodeType.ARTEFACT,
                 _dicSystemVars=self._dicPathSystemVars,
             )
+            xArtType.dicMeta = dicArt.get("mMeta")
             self._dicArtTypes[sArtId] = xArtType
+
+            for sVarId, xPathVar in xArtType.xPathStruct.dicVars.items():
+                if xPathVar.eType != EPathVarType.FIXED:
+                    self._dicVarValues[sVarId] = ""
+                # endif
+            # endfor
+
         # endfor
 
     # enddef

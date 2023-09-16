@@ -347,6 +347,12 @@ class CProductView:
 
     # enddef
 
+    @property
+    def dicVarValues(self) -> dict[str, str]:
+        return self._xProdGrp.dicVarValues
+
+    # enddef
+
     # ####################################################################################################################
     def GetSelectedGroupVarValueCount(self, _sGrpVarId: str) -> int:
         iGrpVarIdx: int = self.lGrpPathVarIds.index(_sGrpVarId)
@@ -840,7 +846,7 @@ class CProductView:
     # enddef
 
     # ####################################################################################################################
-    def GetViewDimNodeIterationValue(self) -> CNode:
+    def GetViewDimNodeIterationValue(self) -> tuple[CNode, CArtefactType]:
         xViewDim: CViewDim = None
         lViewDimArtCom: list[CViewDimArtCommon] = []
 
@@ -878,29 +884,41 @@ class CProductView:
             for xViewDim in lArtViewDims:
                 if isinstance(xViewDim, CViewDimArt):
                     xVda: CViewDimArt = xViewDim
-                    lViewArtPath[xVda.iVarIdx] = xViewDim.sValue
+                    lViewArtPath[xVda.iVarIdx] = xVda.sValue
                 # endif
             # endfor
         # endif
 
+        # Set Variable values
+        dicVarValues = self._xProdGrp.dicVarValues
+
+        for sGrpVarId, sVarValue in zip(self._xProdGrp.xPathStruct.lPathVarIds, self._lViewGrpPath):
+            if sGrpVarId in dicVarValues:
+                dicVarValues[sGrpVarId] = sVarValue
+            # endif
+        # endfor
+
+        dicVarValues["art-type"] = self._sViewArtTypeId
+
+        lArtVarIds = self.GetArtefactPathVarIds(self._sViewArtTypeId)
+        for sArtVarId, sVarValue in zip(lArtVarIds, lViewArtPath):
+            if sArtVarId in dicVarValues:
+                dicVarValues[sArtVarId] = sVarValue
+            # endif
+        # endfor
+
+        # Get node
+        xArtType: CArtefactType = None
         ndArt: CNode = None
         ndGrp: CNode = self._xProdGrp.GetGroupVarNode(self._lViewGrpPath)
         if ndGrp is not None:
-            # print("Node found:")
-            # print(f"> Group path: {self._lViewGrpPath}")
-            # print(f"> Artefact type: {self._sViewArtTypeId}")
-            # print(f"> Artefact path: {lViewArtPath}")
-            # print("")
             ndArt = self._xProdGrp.GetArtVarNode(_xNode=ndGrp, _sArtType=self._sViewArtTypeId, _lArtPath=lViewArtPath)
-        # else:
-        #     print("Node not found:")
-        #     print(f"> Group path: {self._lViewGrpPath}")
-        #     print(f"> Artefact type: {self._sViewArtTypeId}")
-        #     print(f"> Artefact path: {lViewArtPath}")
-        #     print("")
+            if ndArt is not None:
+                xArtType = self.GetArtefactType(self._sViewArtTypeId)
+            # endif
         # endif
 
-        return ndArt
+        return ndArt, xArtType
 
     # enddef
 
