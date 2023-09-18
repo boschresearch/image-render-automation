@@ -51,6 +51,7 @@ class CVariantGroupProducts(CProducts):
     @property
     def xVariantGroup(self) -> CVariantGroup:
         return self._xVarGrp
+
     # enddef
 
     # ######################################################################################################
@@ -58,7 +59,8 @@ class CVariantGroupProducts(CProducts):
         if _pathScan is None:
             raise RuntimeError("Path variable 'variant' must not be the first element of a path structure")
         # endif
-        reGroup: re.Pattern = re.compile(f"{self._xVarGrp.sGroup}-(\\d+)-(\\d+)")
+        reGroup: re.Pattern = re.compile("(\\w+)-(\\d+)-(\\d+)")
+        # reGroup: re.Pattern = re.compile(f"{self._xVarGrp.sGroup}-(\\d+)-(\\d+)")
 
         for pathItem in _pathScan.iterdir():
             xMatch = reGroup.fullmatch(pathItem.name)
