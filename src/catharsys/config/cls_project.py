@@ -53,7 +53,6 @@ from catharsys.util import path
 
 # Project paths for a given configuration
 class CProjectConfig:
-
     #######################################################################
     # getter functions
     @property
@@ -109,6 +108,10 @@ class CProjectConfig:
         return self._pathActProd
 
     @property
+    def pathProduction(self):
+        return self._pathProduction
+
+    @property
     def sConfigFolderName(self):
         return self._sFolderConfig
 
@@ -135,7 +138,6 @@ class CProjectConfig:
     #############################################################################
     # Constructor
     def __init__(self, *, sFileBasenameLaunch: Optional[str] = None):
-
         self._pathLaunch: Path = None
         self._pathLaunchFile: Path = None
         self._pathMain: Path = None
@@ -159,7 +161,6 @@ class CProjectConfig:
 
     #############################################################################
     def IsLaunchFileValid(self) -> bool:
-
         if not self.pathLaunchFile.exists():
             return False, "Launch file does not exist at path: {}".format(self.sLaunchFilePath)
         # endif
@@ -176,7 +177,6 @@ class CProjectConfig:
 
     #############################################################################
     def AssertLaunchFileValid(self) -> bool:
-
         if not self.pathLaunchFile.exists():
             raise CAnyError_Message(sMsg=f"Launch file does not exist at path: {self.sLaunchFilePath}")
         # endif
@@ -252,7 +252,6 @@ class CProjectConfig:
 
     #############################################################################
     def FromConfigName(self, *, xPathMain, sConfigName):
-
         pathMain = None
 
         if not isinstance(sConfigName, str):
@@ -303,7 +302,6 @@ class CProjectConfig:
 
     #############################################################################
     def FromProject(self, _xPrjCfg):
-
         if not isinstance(_xPrjCfg, CProjectConfig):
             raise CAnyError_Message(sMsg="Invalid project class type")
         # endif
@@ -335,7 +333,6 @@ class CProjectConfig:
 
     #######################################################################
     def GetAbsPath(self, _xRelPath):
-
         """
         Create an absolute path from the given relative path
         using the script path as base path.
@@ -475,7 +472,6 @@ class CProjectConfig:
 
     ################################################################
     def GetFilepathVarDict(self, _xFilepath):
-
         pathFile = path.MakeNormPath(_xFilepath)
         if pathFile.is_file():
             pathRelCfg = Path(os.path.relpath(pathFile.as_posix(), self.sConfigPath))

@@ -25,6 +25,7 @@
 ###
 
 from typing import Optional
+from timeit import default_timer as timer
 
 from anybase import config, plugin
 from anybase.cls_any_error import CAnyError_Message, CAnyError_TaskMessage
@@ -78,18 +79,13 @@ class CActionFactory:
 
     ########################################################################################
     @logFunctionCall
-    def CreateAction(
-        self, *, sAction: str, dicConfigOverride: Optional[dict] = None
-    ) -> CActionClassExecutor:
-
+    def CreateAction(self, *, sAction: str, dicConfigOverride: Optional[dict] = None) -> CActionClassExecutor:
         try:
             # Resolve potential action aliases
             sActionName, xActCfgLaunch = self._xCfgLaunch.ResolveActionAlias(sAction)
 
             # Get action launch configuration data
-            dicActData = xActCfgLaunch.GetActionData(
-                sActionName, dicConfigOverride=dicConfigOverride
-            )
+            dicActData = xActCfgLaunch.GetActionData(sActionName, dicConfigOverride=dicConfigOverride)
 
             try:
                 # Get the action DTI, which is used to load the actual action plugin
@@ -97,12 +93,10 @@ class CActionFactory:
                 dicActArgs = dicActData["mConfig"]
 
             except KeyError as xEx:
-                raise CAnyError_Message(
-                    sMsg="Element '{}' not specified in launch configuration".format(
-                        str(xEx)
-                    )
-                )
+                raise CAnyError_Message(sMsg="Element '{}' not specified in launch configuration".format(str(xEx)))
             # endtry
+
+            # tmStart = timer()
 
             # Look for action module
             epAction = plugin.SelectEntryPointFromDti(
@@ -112,6 +106,9 @@ class CActionFactory:
             )
 
             modAction = epAction.load()
+            # tmValue = timer() - tmStart
+            # print(f"load action module: {tmValue}")
+
             dicActCfg = modAction.GetDefinition()
             sActClsDti = dicActCfg.get("sDTI")
             sPrjDti = dicActCfg.get("sProjectClassDTI")

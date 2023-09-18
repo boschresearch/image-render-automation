@@ -37,7 +37,7 @@ from catharsys.config.cls_launch import CConfigLaunch
 
 from .cls_action import CAction
 
-TWorkspace = ForwardRef("Workspace")
+TWorkspace = "CWorkspace"
 
 
 #########################################################################
@@ -63,26 +63,29 @@ class CProject:
         return self._xWorkspace
 
     @property
-    def xConfig(self) -> CProjectConfig:
-        return self._xPrjCfg
-
-    @property
     def xLaunch(self) -> CConfigLaunch:
         return self._xLaunch
 
     #####################################################################
     def __init__(self, _xPrjCfg: CProjectConfig, *, xWorkspace: Optional[TWorkspace] = None):
-        self._xWorkspace = xWorkspace
-        self._xPrjCfg = _xPrjCfg
-        self._xLaunch = CConfigLaunch()
-        self._xLaunch.LoadFile(_xPrjCfg)
+        self._xWorkspace: TWorkspace = xWorkspace
+        self._xPrjCfg: CProjectConfig = _xPrjCfg
+        self._xLaunch: CConfigLaunch = CConfigLaunch()
+        self._lActionPaths: list = []
+        self.Update()
+
+    # enddef
+
+    #####################################################################
+    def Update(self):
+        self._xLaunch.LoadFile(self._xPrjCfg)
         self._lActionPaths = self._xLaunch.GetActionPaths()
 
     # enddef
 
     #####################################################################
     def GetActionInfo(self, _sAction: str):
-        if not _sAction in self._lActionPaths:
+        if _sAction not in self._lActionPaths:
             raise RuntimeError(f"Action '{_sAction}' not available in project '{self.sId}'")
         # endif
         return self._xLaunch.GetActionInfo(_sAction)
@@ -100,7 +103,7 @@ class CProject:
 
     #####################################################################
     def Action(self, _sAction: str, *, _dicConfigOverride: dict = None) -> CAction:
-        if not _sAction in self._lActionPaths:
+        if _sAction not in self._lActionPaths:
             raise RuntimeError(f"Action '{_sAction}' not available in project '{self.sId}'")
         # endif
 

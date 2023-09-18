@@ -1,13 +1,9 @@
-#!/usr/bin/env python3
-# -*- coding:utf-8 -*-
 ###
-# File: \__init__.py
-# Created Date: Friday, April 22nd 2022, 2:28:36 pm
-# Author: Christian Perwass (CR/AEC5)
+# Author: Christian Perwass (CR/ADI2.1)
 # <LICENSE id="Apache-2.0">
 #
 #   Image-Render Automation Functions module
-#   Copyright 2022 Robert Bosch GmbH and its subsidiaries
+#   Copyright 2023 Robert Bosch GmbH and its subsidiaries
 #
 #   Licensed under the Apache License, Version 2.0 (the "License");
 #   you may not use this file except in compliance with the License.
@@ -24,11 +20,15 @@
 # </LICENSE>
 ###
 
+import enum
 
-from .cls_workspace import CWorkspace
-from .cls_project import CProject
-from .cls_action import CAction
-from .cls_variants import CVariants
 
-from .cls_result_data import CResultData
-from .cls_action_result_data import CActionResultData
+class EJobStatus(enum.Enum):
+    NOT_STARTED = enum.auto()
+    STARTING = enum.auto()
+    RUNNING = enum.auto()
+    ENDED = enum.auto()
+    TERMINATED = enum.auto()
+
+
+# endclass

@@ -110,6 +110,7 @@ class CLoopConfigs:
         # xCfgValue = _xCfgVars.GetVarData().get("value")
         if xCfgValue is not None and isinstance(xCfgValue, dict):
             sCfgFilter = xCfgValue.get("sFilter")
+            # print(sCfgFilter)
         # endif
 
         sEval = None
@@ -122,6 +123,7 @@ class CLoopConfigs:
 
             if sCfgFilter is not None:
                 sCfgEval = _xCfgVars.Process(sCfgFilter)
+                # print(sCfgEval)
             # endif
         except Exception as xEx:
             raise Exception("Error in filter for config with id '{0}':\n{1}".format(sId, str(xEx)))
@@ -129,11 +131,21 @@ class CLoopConfigs:
 
         try:
             bTest = True
-            bCfgTest = True
 
             if sEval is not None:
                 bTest = eval(sEval)
             # endif
+
+        except Exception as xEx:
+            raise Exception(
+                "Error in manifest filter for config with id '{0}':\ncannot execute filter expression: {1}\n{2}".format(
+                    sId, sEval, xEx
+                )
+            )
+        # endtry
+
+        try:
+            bCfgTest = True
 
             if sCfgEval is not None:
                 bCfgTest = eval(sCfgEval)
@@ -141,7 +153,9 @@ class CLoopConfigs:
 
         except Exception as xEx:
             raise Exception(
-                "Error in filter for config with id '{0}': " "cannot execute filter expression\n{1}".format(sId, xEx)
+                "Error in filter for config with id '{0}':\ncannot execute filter expression: {1}\n{2}".format(
+                    sId, sCfgEval, xEx
+                )
             )
         # endtry
 

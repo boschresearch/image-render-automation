@@ -24,9 +24,16 @@
 # </LICENSE>
 ###
 
+import warnings
+
 from collections import defaultdict
 
-import pkg_resources
+with warnings.catch_warnings():
+    warnings.filterwarnings("ignore", category=DeprecationWarning)
+    # pkg_resources is DEPRECATED and should be replaced at some point.
+    import pkg_resources
+# endwith
+
 import importlib
 import inspect
 import os

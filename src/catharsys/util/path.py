@@ -38,7 +38,6 @@ from . import version
 # This functions copies the creation of the cath user path from catharsys.setup.util, as that module
 # is not available in a Blender context.
 def GetCathUserPath(*, _bCheckExists: bool = False) -> Path:
-
     sCondaEnvName = os.environ.get("CONDA_DEFAULT_ENV")
     if sCondaEnvName is None:
         raise RuntimeError("Conda environment name system environment variable not set")
@@ -53,3 +52,5 @@ def GetCathUserPath(*, _bCheckExists: bool = False) -> Path:
 
 
 # enddef
+
+

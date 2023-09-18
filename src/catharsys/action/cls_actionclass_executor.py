@@ -24,11 +24,12 @@
 # </LICENSE>
 ###
 
-from typing import Optional
+from typing import Optional, Callable
 
 from catharsys.config.cls_project import CProjectConfig
 from catharsys.config.cls_launch import CConfigLaunch
 from catharsys.config.cls_job import CConfigJob
+from catharsys.config.cls_exec_job import CConfigExecJob
 
 
 ##########################################################################################
@@ -67,14 +68,11 @@ class CActionClassExecutor:
         xCfgLaunch: CConfigLaunch,
         dicActArgsOverride: Optional[dict] = None
     ):
-
         self._xPrjCfg: CProjectConfig = xPrjCfg
         self._sAction: str = sAction
         self._dicActCfg: dict = dicActCfg
         self._xCfgLaunch: CConfigLaunch = xCfgLaunch
-        self._dicActions: dict = xCfgLaunch.GetActionDict(
-            dicConfigOverride=dicActArgsOverride
-        )
+        self._dicActions: dict = xCfgLaunch.GetActionDict(dicConfigOverride=dicActArgsOverride)
 
         self._sActClsDti: str = self._dicActCfg.get("sDTI")
 
@@ -84,7 +82,25 @@ class CActionClassExecutor:
     # enddef
 
     ######################################################################################
-    def Execute(self, bDoProcess: bool = True, dicDebug: bool = None) -> CConfigJob:
+    def GetJobConfig(self, *, _funcStatus: Optional[Callable[[int, int], None]] = None) -> CConfigJob:
+        return None
+
+    # enddef
+
+    ######################################################################################
+    def GetExecJobConfigList(self, _xJob: CConfigJob) -> list[CConfigExecJob]:
+        return None
+
+    # enddef
+
+    ######################################################################################
+    def ExecuteJobList(self, _lExecJobs: list[CConfigExecJob]):
+        return None
+
+    # enddef
+
+    ######################################################################################
+    def Execute(self, *, bDoProcess: bool = True, dicDebug: bool = None) -> CConfigJob:
         return CConfigJob(sDTI="none")
 
     # enddef
