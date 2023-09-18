@@ -46,6 +46,16 @@ class CVariantGroupProducts(CProducts):
             )
         )
 
+        self.RegisterSystemVar(
+            CPathVar(
+                sId="my-variant",
+                sName="Configuration Variant",
+                eType=EPathVarType.SYSTEM,
+                eNodeType=ENodeType.PATH,
+                funcHandler=self._OnVarMyVariant,
+            )
+        )
+
     # enddef
 
     @property
@@ -61,6 +71,23 @@ class CVariantGroupProducts(CProducts):
         # endif
         reGroup: re.Pattern = re.compile("(\\w+)-(\\d+)-(\\d+)")
         # reGroup: re.Pattern = re.compile(f"{self._xVarGrp.sGroup}-(\\d+)-(\\d+)")
+
+        for pathItem in _pathScan.iterdir():
+            xMatch = reGroup.fullmatch(pathItem.name)
+            if not pathItem.is_dir() or xMatch is None:
+                continue
+            # endif
+            yield CPathVarHandlerResult(pathItem, pathItem.name, (xMatch.group(1), xMatch.group(2), xMatch.group(3)))
+        # endfor
+
+    # enddef
+
+    # ######################################################################################################
+    def _OnVarMyVariant(self, _pathScan: Path) -> Iterator[CPathVarHandlerResult]:
+        if _pathScan is None:
+            raise RuntimeError("Path variable 'variant' must not be the first element of a path structure")
+        # endif
+        reGroup: re.Pattern = re.compile(f"{self._xVarGrp.sGroup}-(\\d+)-(\\d+)")
 
         for pathItem in _pathScan.iterdir():
             xMatch = reGroup.fullmatch(pathItem.name)
