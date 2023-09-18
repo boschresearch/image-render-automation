@@ -93,6 +93,18 @@ class CVariantGroup:
 
     # enddef
 
+    @property
+    def pathVariants(self) -> Path:
+        return self._pathVariants
+
+    # enddef
+
+    @property
+    def pathGroup(self) -> Path:
+        return self._pathGroup
+
+    # enddef
+
     # ############################################################################################
     def FromConfig(self, *, _prjX: CProject, _dicCfg: dict):
         _sGroup: str = _dicCfg.get("sName")
