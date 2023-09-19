@@ -71,7 +71,16 @@ class CGroup:
     # enddef
 
     @property
+    def sName(self) -> str:
+        return self._sName
+
+    # enddef
+
+    @property
     def bHasData(self) -> bool:
+        if self._xTree is None:
+            return False
+        # endif
         return len(self._xTree.children) > 0
 
     # enddef
@@ -218,12 +227,35 @@ class CGroup:
     # enddef
 
     # ######################################################################################################
+    def _RepresentsInt(self, _sValue: str):
+        try:
+            int(_sValue)
+        except Exception:
+            return False
+        # endtry
+        return True
+
+    # enddef
+
+    # ######################################################################################################
+    def _ToInt(self, _sValue: str):
+        return int(_sValue)
+
+    # enddef
+
+    # ######################################################################################################
     def _GetVarValueLists(self, *, _xNode: CNode, _iMaxLevel: int) -> list[list[str]]:
         lVarValueSets = self._GetVarValueSets(_xNode=_xNode, _iMaxLevel=_iMaxLevel)
 
         lVarValues = [list(x) for x in lVarValueSets[1:]]
         for lX in lVarValues:
-            lX.sort()
+            if len(lX) > 0:
+                if self._RepresentsInt(lX[0]) is True:
+                    lX.sort(key=self._ToInt)
+                else:
+                    lX.sort()
+                # endif
+            # endif
         # endfor
 
         return lVarValues

@@ -23,7 +23,7 @@
 import re
 import copy
 from pathlib import Path
-from typing import Iterator
+from typing import Iterator, Optional
 
 from catharsys.api.cls_project import CProject
 
@@ -103,6 +103,18 @@ class CProducts:
     # enddef
 
     @property
+    def lGroupNames(self) -> list[str]:
+        return [xGrp.sName for xGrp in self._dicGroups.values()]
+
+    # enddef
+
+    @property
+    def dicGroupKeyNames(self) -> dict[str, str]:
+        return {k: v.sName for k, v in self._dicGroups.items()}
+
+    # enddef
+
+    @property
     def iGroupCount(self) -> int:
         return len(self._dicGroups)
 
@@ -120,10 +132,18 @@ class CProducts:
     # enddef
 
     # #####################################################################################################
-    def ScanArtefacts(self):
-        for sGroup in self._dicGroups:
-            self._dicGroups[sGroup].ScanArtefacts()
-        # endfor
+    def ScanArtefacts(self, *, _sGroupId: Optional[str] = None):
+        if _sGroupId is None:
+            for sGroup in self._dicGroups:
+                self._dicGroups[sGroup].ScanArtefacts()
+            # endfor
+        else:
+            xGrp = self._dicGroups.get(_sGroupId)
+            if xGrp is None:
+                raise RuntimeError(f"Group '{_sGroupId}' not available")
+            # endif
+            xGrp.ScanArtefacts()
+        # endif
 
     # enddef
 

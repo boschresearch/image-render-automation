@@ -231,6 +231,12 @@ class CProductView:
     # enddef
 
     @property
+    def dicGroupKeyNames(self) -> dict[str, str]:
+        return self._xProdData.dicGroupKeyNames
+
+    # enddef
+
+    @property
     def iGroupCount(self) -> int:
         return self._xProdData.iGroupCount
 
@@ -431,8 +437,8 @@ class CProductView:
     # enddef
 
     # ####################################################################################################################
-    def ScanArtefacts(self):
-        self._xProdData.ScanArtefacts()
+    def ScanArtefacts(self, *, _sGroupId: Optional[str] = None):
+        self._xProdData.ScanArtefacts(_sGroupId=_sGroupId)
 
     # enddef
 
@@ -447,9 +453,10 @@ class CProductView:
         # endif
 
         self._xProdGrp = self._xProdData.dicGroups[_sGroup]
-
-        self._lGrpVarValueLists = self._xProdGrp.GetGroupVarValueLists()
-        self._lGrpVarLabelLists = self._xProdGrp.GetGroupVarLabelLists(self._lGrpVarValueLists)
+        if self._xProdGrp.bHasData is True:
+            self._lGrpVarValueLists = self._xProdGrp.GetGroupVarValueLists()
+            self._lGrpVarLabelLists = self._xProdGrp.GetGroupVarLabelLists(self._lGrpVarValueLists)
+        # endif
 
         return True
 
