@@ -19,7 +19,7 @@
 #
 # </LICENSE>
 ###
-
+import getpass
 from typing import Optional, Any
 from pathlib import Path
 from anybase import config
@@ -58,7 +58,8 @@ from ..util import fsops
 #   active trial group variant.
 #
 class CVariants:
-    c_sFolderVariants = ".variants"
+    c_sOsUser: str = getpass.getuser()
+    c_sFolderVariants = f".variants-{(getpass.getuser())}"
     c_sFolderInstances = "_instances"
     c_sFileVariants = "variants.json"
     c_lConfigSuffix = [".json", ".json5", ".ison"]
