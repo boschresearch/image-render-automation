@@ -58,8 +58,8 @@ from ..util import fsops
 #   active trial group variant.
 #
 class CVariants:
-    c_sOsUser: str = getpass.getuser()
-    c_sFolderVariants = f".variants-{(getpass.getuser())}"
+    c_sOsUser: str = getpass.getuser().lower()
+    c_sFolderVariants = f".variants-{(getpass.getuser().lower())}"
     c_sFolderInstances = "_instances"
     c_sFileVariants = "variants.json"
     c_lConfigSuffix = [".json", ".json5", ".ison"]

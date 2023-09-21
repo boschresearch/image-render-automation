@@ -63,6 +63,11 @@ class CViewDimNode:
     # enddef
 
     @property
+    def sDimLabel(self) -> str:
+        return self._xViewDim.sDimLabel
+    # enddef
+    
+    @property
     def sValue(self) -> str:
         return self._xProdView.GetViewDimValue(self._xViewDim)
 
@@ -720,6 +725,7 @@ class CProductView:
         _sArtTypeId: Optional[str] = None,
     ):
         sDimId, eDimType = self.GetDimIdType(_sDimKey)
+        sDimLabel = self._dicViewDimNames.get(_sDimKey, "")
 
         bRangeValid: bool = _iRangeMin is not None and _iRangeMax is not None
         iMin: int = _iRangeMin
@@ -742,6 +748,7 @@ class CProductView:
                 _lLabels=lGrpVarLabels,
                 _iMin=iMin,
                 _iMax=iMax,
+                _sDimLabel=sDimLabel,
             )
 
         elif eDimType == EViewDimType.ARTCOMVAR:
@@ -773,10 +780,11 @@ class CProductView:
                 _lVarIdx=lArtVarIdx,
                 _iMin=iMin,
                 _iMax=iMax,
+                _sDimLabel=sDimLabel,
             )
 
         elif eDimType == EViewDimType.ARTTYPE:
-            xViewDim = CViewDimArtType(_lArtTypes=self._lSelActArtTypeIds)
+            xViewDim = CViewDimArtType(_lArtTypes=self._lSelActArtTypeIds, _sDimLabel=sDimLabel)
 
         elif eDimType == EViewDimType.ARTVAR:
             if _sArtTypeId is None:
@@ -800,6 +808,7 @@ class CProductView:
                 _lLabels=lArtVarLabels,
                 _iMin=iMin,
                 _iMax=iMax,
+                _sDimLabel=sDimLabel,
             )
 
         else:

@@ -34,8 +34,9 @@ class EViewDimType(enum.Enum):
 
 
 class CViewDim:
-    def __init__(self, *, _eType: EViewDimType):
+    def __init__(self, *, _eType: EViewDimType, _sDimLabel: str = ""):
         self._eType: EViewDimType = _eType
+        self._sDimLabel: str = _sDimLabel
         self._iIdx: int = 0
         self._iCnt: int = 0
         self._iMin: int = 0
@@ -73,6 +74,12 @@ class CViewDim:
 
     # enddef
 
+    @property
+    def sDimLabel(self) -> str:
+        return self._sDimLabel
+
+    # enddef
+
     def Next(self) -> bool:
         if self._iIdx + 1 > self._iMax:
             self._iIdx = self._iMin
@@ -94,9 +101,17 @@ class CViewDim:
 
 class CViewDimGrp(CViewDim):
     def __init__(
-        self, *, _sVarId: str, _iVarIdx: int, _lValues: list[str], _lLabels: list[str], _iMin: int, _iMax: int
+        self,
+        *,
+        _sVarId: str,
+        _iVarIdx: int,
+        _lValues: list[str],
+        _lLabels: list[str],
+        _iMin: int,
+        _iMax: int,
+        _sDimLabel: str = "",
     ):
-        super().__init__(_eType=EViewDimType.GROUP)
+        super().__init__(_eType=EViewDimType.GROUP, _sDimLabel=_sDimLabel)
         self._sVarId: str = _sVarId
         self._iVarIdx: int = _iVarIdx
         self._lValues: list[str] = _lValues
@@ -145,9 +160,10 @@ class CViewDimArtCommon(CViewDim):
         _lValues: list[str],
         _lLabels: list[str],
         _iMin: int,
-        _iMax: int
+        _iMax: int,
+        _sDimLabel: str = "",
     ):
-        super().__init__(_eType=EViewDimType.ARTCOMVAR)
+        super().__init__(_eType=EViewDimType.ARTCOMVAR, _sDimLabel=_sDimLabel)
         self._lArtTypeIds: list[str] = _lArtTypeIds
         self._lVarIdx: list[int] = _lVarIdx
         self._sVarId: str = _sVarId
@@ -194,8 +210,8 @@ class CViewDimArtCommon(CViewDim):
 
 
 class CViewDimArtType(CViewDim):
-    def __init__(self, *, _lArtTypes: list[str]):
-        super().__init__(_eType=EViewDimType.ARTTYPE)
+    def __init__(self, *, _lArtTypes: list[str], _sDimLabel: str = ""):
+        super().__init__(_eType=EViewDimType.ARTTYPE, _sDimLabel=_sDimLabel)
         self._lArtTypes: list[str] = _lArtTypes
         self._iCnt = len(self._lArtTypes)
         self._iMin = 0
@@ -223,9 +239,10 @@ class CViewDimArt(CViewDim):
         _lValues: list[str],
         _lLabels: list[str],
         _iMin: int,
-        _iMax: int
+        _iMax: int,
+        _sDimLabel: str = "",
     ):
-        super().__init__(_eType=EViewDimType.ARTVAR)
+        super().__init__(_eType=EViewDimType.ARTVAR, _sDimLabel=_sDimLabel)
         self._sArtTypeId: str = _sArtTypeId
         self._iVarIdx: int = _iVarIdx
         self._sVarId: str = _sVarId
