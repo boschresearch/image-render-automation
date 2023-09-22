@@ -57,6 +57,7 @@ class CPathVar:
     funcHandler: Callable[[Path], Iterator[CPathVarHandlerResult]] = None
     sReParseValue: str = None
     sReReplaceValue: str = None
+    funcLabel: Callable[["CPathVar", str], str] = None
 
 
 # endclass
@@ -75,11 +76,14 @@ class CPathStructure:
         self._eLastElementNodeType: ENodeType = _eLastElementNodeType
         self._lPathVars: list[str] = []
         self._dicVars: dict[str, CPathVar] = dict()
-        self._dicSystemVars: dict[str, CPathVar] = None
-        if _dicSystemVars is not None:
-            self._dicSystemVars = copy.deepcopy(_dicSystemVars)
-        # endif
+        self._dicSystemVars: dict[str, CPathVar] = _dicSystemVars
 
+        # For some strange reason a deep copy of the system vars dictionary
+        # gets slower and slower. I don't really know what it's doing,
+        # but the copy isn't really needed anyway.
+        # if _dicSystemVars is not None:
+        #     self._dicSystemVars = copy.deepcopy(_dicSystemVars)
+        # # endif
         self._ParsePathStruct(_dicUserVars)
 
     # enddef
@@ -142,7 +146,7 @@ class CPathStructure:
             # endif
 
             self._lPathVars.append(sVarId)
-        # endif
+        # endfor
 
     # enddef
 
