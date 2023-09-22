@@ -33,6 +33,7 @@ class CResolvedAction:
     sActionPath: str
     sBaseAction: str
     sTrialFile: str
+    lTrialFileOptions: list[str]
     xLaunch: CConfigLaunch
 
 
@@ -55,8 +56,9 @@ class CTrialActions:
     @property
     def dicLaunch(self) -> dict:
         return self._xLaunch.dicLaunch
+
     # enddef
-    
+
     @property
     def dicGlobalArgs(self) -> dict:
         return self._xLaunch.dicGlobalArgs
@@ -79,29 +81,100 @@ class CTrialActions:
 
     # enddef
 
+    def GetTrialSelection(self) -> str:
+        sTrial: str = self._xLaunch.dicGlobalArgs.get("sTrialFile")
+        if sTrial is None:
+            sTrial = self.lTrialFiles[0]
+        # endif
+        return sTrial
+    # enddef
+
+    # #####################################################################################################
+    def SetActiveTrial(self, _sTrial: str):
+        sGlobalTrialFile: str = self._xLaunch.dicGlobalArgs.get("sTrialFile")
+        lGlobalTrialFileOptions: list[str] = self._xLaunch.dicGlobalArgs.get("lTrialFileOptions")
+
+        if sGlobalTrialFile is not None and isinstance(lGlobalTrialFileOptions, list):
+            if _sTrial in lGlobalTrialFileOptions:
+                if sGlobalTrialFile not in lGlobalTrialFileOptions:
+                    lGlobalTrialFileOptions.append(sGlobalTrialFile)
+                # endif
+                self._xLaunch.dicGlobalArgs["sTrialFile"] = _sTrial
+            # endif
+        # endif
+
+        lActionPaths: list[str] = self._dicTrialActionPaths.get(_sTrial)
+        if lActionPaths is not None:
+            for sActionPath in lActionPaths:
+                xResAct: CResolvedAction = self._dicActionSet[sActionPath]
+                dicActCfg: dict = xResAct.xLaunch.GetActionConfig(xResAct.sBaseAction)
+                lTrialFileOptions: list[str] = dicActCfg.get("lTrialFileOptions", lGlobalTrialFileOptions)
+                if "sTrialFile" in dicActCfg and isinstance(lTrialFileOptions, list) and _sTrial in lTrialFileOptions:
+                    sCurTrial = dicActCfg["sTrialFile"]
+                    if sCurTrial not in lTrialFileOptions:
+                        lCurTrialFileOptions: list[str] = dicActCfg.get("lTrialFileOptions")
+                        if isinstance(lCurTrialFileOptions, list):
+                            lCurTrialFileOptions.append(sCurTrial)
+                        else:
+                            dicActCfg["lTrialFileOptions"] = [sCurTrial] + lGlobalTrialFileOptions
+                        # endif
+                    # endif
+                    dicActCfg["sTrialFile"] = _sTrial
+                # endif
+            # endfor
+        # endif
+
+    # enddef
+
     # #####################################################################################################
     def _UpdateResolvedActions(self):
         sGlobalTrialFile: str = self._xLaunch.dicGlobalArgs.get("sTrialFile")
+        lGlobalTrialFileOptions: list[str] = self._xLaunch.dicGlobalArgs.get("lTrialFileOptions")
 
         self._dicActionSet = {}
         self._dicTrialActionPaths = {}
 
         for sActionPath in self._lActionPaths:
             sBaseAction, xActLaunch = self._xLaunch.ResolveActionAlias(sActionPath)
-            sTrialFile = xActLaunch.GetActionConfig(sBaseAction).get("sTrialFile")
+            dicActCfg: dict = xActLaunch.GetActionConfig(sBaseAction)
+            sTrialFile = dicActCfg.get("sTrialFile")
             if sTrialFile is None:
                 sTrialFile = sGlobalTrialFile
             # endif
+            lTrialFileOptions = dicActCfg.get("lTrialFileOptions")
+            if lTrialFileOptions is None:
+                lTrialFileOptions = lGlobalTrialFileOptions
+            # endif
+
+            if sTrialFile is None:
+                raise RuntimeError(f"No trial file specified for action: {sActionPath}")
+            # endif
+
+            lActTrialFileOptions: list[str]
+            if not isinstance(lTrialFileOptions, list):
+                lActTrialFileOptions = [sTrialFile]
+            else:
+                lActTrialFileOptions = lTrialFileOptions.copy()
+                if sTrialFile not in lActTrialFileOptions:
+                    lActTrialFileOptions.append(sTrialFile)
+                # endif
+            # endif
 
             self._dicActionSet[sActionPath] = CResolvedAction(
-                sActionPath=sActionPath, sBaseAction=sBaseAction, sTrialFile=sTrialFile, xLaunch=xActLaunch
+                sActionPath=sActionPath,
+                sBaseAction=sBaseAction,
+                sTrialFile=sTrialFile,
+                lTrialFileOptions=lActTrialFileOptions,
+                xLaunch=xActLaunch,
             )
 
-            lTrialAction = self._dicTrialActionPaths.get(sTrialFile)
-            if lTrialAction is None:
-                lTrialAction = self._dicTrialActionPaths[sTrialFile] = []
-            # endif
-            lTrialAction.append(sActionPath)
+            for sActTrialFile in lActTrialFileOptions:
+                lTrialAction = self._dicTrialActionPaths.get(sActTrialFile)
+                if lTrialAction is None:
+                    lTrialAction = self._dicTrialActionPaths[sActTrialFile] = []
+                # endif
+                lTrialAction.append(sActionPath)
+            # endfor
         # endfor
 
     # enddef

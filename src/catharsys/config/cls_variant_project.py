@@ -118,6 +118,16 @@ class CVariantProject:
 
     # enddef
 
+    @property
+    def sInfo(self) -> str:
+        return self._sInfo
+    # enddef
+
+    @sInfo.setter
+    def sInfo(self, sValue: str):
+        self._sInfo = sValue
+    # enddef
+
     # ############################################################################################
     def GetLaunchFilename(self, _iId: int) -> str:
         return f"{self._sLaunchFileStem}-{_iId}.json"
@@ -162,6 +172,17 @@ class CVariantProject:
         self._setLaunchFileIds = set(convert.DictElementToIntList(_dicCfg, "lLaunchFileIds"))
         self._iSelectedLaunchFileId = convert.DictElementToInt(_dicCfg, "iSelectedLaunchFileId")
         self._iNextLaunchFileId = convert.DictElementToInt(_dicCfg, "iNextLaunchFileId")
+
+        self._dicLaunchFileInfo: dict[int, str] = None
+        dicLaunchFileInfo = _dicCfg.get("mLaunchFileInfo")
+        if dicLaunchFileInfo is None:
+            self._dicLaunchFileInfo = dict()
+            for iLaunchFileId in self._setLaunchFileIds:
+                self._dicLaunchFileInfo[iLaunchFileId] = ""
+            # endfor
+        else:
+            self._dicLaunchFileInfo = {int(k): v for k, v in dicLaunchFileInfo.items()}
+        # endif
 
         self._xLaunch = CConfigLaunch(config.Load(self.pathLaunchFile, bReplacePureVars=False))
 
@@ -364,6 +385,7 @@ class CVariantProject:
             "sSrcLaunchFilename": self._sSrcLaunchFilename,
             "sLaunchFileStem": self._sLaunchFileStem,
             "lLaunchFileIds": list(self._setLaunchFileIds),
+            "mLaunchFileInfo": self._dicLaunchFileInfo,
             "iSelectedLaunchFileId": self._iSelectedLaunchFileId,
             "iNextLaunchFileId": self._iNextLaunchFileId,
             "mTrialVariants": dicTrialVars,

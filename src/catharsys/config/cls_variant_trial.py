@@ -52,6 +52,17 @@ class CVariantTrial:
 
     # enddef
 
+    @property
+    def sInfo(self) -> str:
+        return self._sInfo
+    # enddef
+
+    @sInfo.setter
+    def sInfo(self, sValue: str):
+        self._sInfo = sValue
+    # enddef
+
+
     # ##################################c##########################################################
     def _Clear(self):
         self._iId: int = None
@@ -133,15 +144,23 @@ class CVariantTrial:
     # ############################################################################################
     def AddFileConfig(self, _sRelPathFile: str):
         pathSrc = self.GetConfigSourceAbsPath(_sRelPathFile)
+        # print(f"pathSrc: {pathSrc}")
         if pathSrc is None:
             raise RuntimeError(f"Source file does not exist: {(pathSrc.as_posix())}[.json|.json5|.ison]")
         # endif
 
         sSrcRel = self.GetConfigVariantRelPathFromSourceAbsPath(pathSrc)
+        # print(f"sSrcRel: {sSrcRel}")
 
         pathTrg: Path = self._pathVariant / sSrcRel
+        # print(f"pathTrg: {pathTrg}")
         if pathTrg.exists():
-            raise RuntimeError(f"Target file already exists: {(pathTrg.as_posix())}")
+            if sSrcRel not in self._lRelPathFiles:
+                self._lRelPathFiles.append(sSrcRel)
+                return
+            else:
+                raise RuntimeError(f"Target file already exists: {(pathTrg.as_posix())}")
+            # endif
         # endif
 
         # Load config file and save as standard json
@@ -200,6 +219,7 @@ class CVariantTrial:
         lVarRelFilePaths: list[str] = []
         for sTrialFile in self._xTrialAct.lTrialFiles:
             pathSrc = self.GetConfigSourceAbsPath(sTrialFile)
+            # print(f"{sTrialFile}: {pathSrc}")
             if pathSrc is None:
                 continue
             # endif
@@ -247,8 +267,10 @@ class CVariantTrial:
         dicData = {
             "sDTI": "/catharsys/variants/trial:1.0",
             "iId": self._iId,
+            "sInfo": self._sInfo,
             "lRelPathFiles": self._lRelPathFiles,
         }
+        # print(f"Serialize Trial Variant:\n{dicData}\n")
         return dicData
 
     # enddef
