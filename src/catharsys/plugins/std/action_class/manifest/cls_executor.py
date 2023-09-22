@@ -752,7 +752,7 @@ class CActionClassManifestExecutor(CActionClassExecutor):
                 dicArgs = self.dicJobFutures[futJob]
                 try:
                     sName = dicArgs["sJobNameLong"]
-                    print(f"Finished job: {sName}")
+                    # print(f"Finished job: {sName}")
                     futJob.result()
                 except Exception as xEx:
                     sMsg = f"Exception running job:\n{(str(xEx))}"
