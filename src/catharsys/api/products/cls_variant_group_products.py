@@ -25,6 +25,8 @@ from pathlib import Path
 from typing import Iterator
 
 from catharsys.config.cls_variant_group import CVariantGroup
+from catharsys.config.cls_variant_project import CVariantProject
+from catharsys.config.cls_variant_trial import CVariantTrial
 
 from .cls_products import CProducts
 from .cls_path_structure import CPathVar, EPathVarType, CPathVarHandlerResult
@@ -35,6 +37,7 @@ class CVariantGroupProducts(CProducts):
     def __init__(self, *, _xVariantGroup: CVariantGroup):
         super().__init__(_prjX=_xVariantGroup.xProject)
         self._xVarGrp: CVariantGroup = _xVariantGroup
+        self._reGroup: re.Pattern = re.compile(f"{self._xVarGrp.sGroup}-(\\d+)-(\\d+)")
 
         self.RegisterSystemVar(
             CPathVar(
@@ -53,6 +56,7 @@ class CVariantGroupProducts(CProducts):
                 eType=EPathVarType.SYSTEM,
                 eNodeType=ENodeType.PATH,
                 funcHandler=self._OnVarMyVariant,
+                funcLabel=self._OnVarMyVariantLabel,
             )
         )
 
@@ -87,10 +91,9 @@ class CVariantGroupProducts(CProducts):
         if _pathScan is None:
             raise RuntimeError("Path variable 'variant' must not be the first element of a path structure")
         # endif
-        reGroup: re.Pattern = re.compile(f"{self._xVarGrp.sGroup}-(\\d+)-(\\d+)")
 
         for pathItem in _pathScan.iterdir():
-            xMatch = reGroup.fullmatch(pathItem.name)
+            xMatch = self._reGroup.fullmatch(pathItem.name)
             if not pathItem.is_dir() or xMatch is None:
                 continue
             # endif
@@ -98,6 +101,41 @@ class CVariantGroupProducts(CProducts):
                 pathItem, pathItem.name, (self._xVarGrp.sGroup, xMatch.group(1), xMatch.group(2))
             )
         # endfor
+
+    # enddef
+
+    # ######################################################################################################
+    def _GetShortInfo(self, _sInfo: str, _iId: int) -> str:
+        sInfo = _sInfo
+        if ":" in sInfo:
+            sInfo = sInfo[0 : sInfo.index(":")]
+        elif "." in sInfo:
+            sInfo = sInfo[0 : sInfo.index(".")]
+        # endif
+        if len(sInfo) == 0:
+            sInfo = f"{_iId}"
+        # endif
+        return sInfo
+
+    # endif
+
+    # ######################################################################################################
+    def _OnVarMyVariantLabel(self, _xPathVar: CPathVar, _sValue: str) -> str:
+        xMatch = self._reGroup.fullmatch(_sValue)
+        if xMatch is None:
+            return
+        # endif
+
+        iPrjVarId: int = int(xMatch.group(1))
+        iTrialVarId: int = int(xMatch.group(2))
+
+        xPrjVar: CVariantProject = self._xVarGrp.GetProjectVariant(iPrjVarId)
+        xTrialVar: CVariantTrial = xPrjVar.GetTrialVariant(iTrialVarId)
+
+        sPrjInfo: str = self._GetShortInfo(xPrjVar.sInfo, iPrjVarId)
+        sTrialInfo: str = self._GetShortInfo(xTrialVar.sInfo, iTrialVarId)
+
+        return f"{sPrjInfo}: {sTrialInfo}"
 
     # enddef
 

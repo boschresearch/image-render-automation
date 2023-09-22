@@ -168,7 +168,6 @@ class CGroup:
             _nodeParent=self._xTree,
             _iLevel=0,
         )
-
         iMaxGroupLevel: int = self._xPathStruct.iMaxLevel
 
         # Prune nodes that are leaves but not at max group level
@@ -197,7 +196,6 @@ class CGroup:
         # endif
 
         tGroupLeafNodes: tuple[CNode] = tuple(anytree.PreOrderIter(self._xTree, filter_=lambda node: node.is_leaf))
-
         # Scan all artefact types
         sArtTypeId: str = ""
         for sArtTypeId in self._dicArtTypes:
@@ -268,7 +266,11 @@ class CGroup:
         for sVarId, lVarValues in zip(_xPathStruct.lPathVarIds, _lVarValueLists):
             lVarLabel: list[str] = []
             xVar: CPathVar = _xPathStruct.dicVars[sVarId]
-            if xVar.sReParseValue is None or xVar.sReReplaceValue is None:
+            if xVar.funcLabel is not None:
+                for sVarValue in lVarValues:
+                    lVarLabel.append(xVar.funcLabel(xVar, sVarValue))
+                # endfor
+            elif xVar.sReParseValue is None or xVar.sReReplaceValue is None:
                 lVarLabel = lVarValues
             else:
                 for sVarValue in lVarValues:

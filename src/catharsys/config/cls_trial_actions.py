@@ -49,7 +49,7 @@ class CTrialActions:
         self._xLaunch = copy.copy(_xLaunch)
 
         self._lActionPaths = self._xLaunch.GetActionPaths()
-        self._UpdateResolvedActions()
+        self.UpdateResolvedActions()
 
     # enddef
 
@@ -87,6 +87,7 @@ class CTrialActions:
             sTrial = self.lTrialFiles[0]
         # endif
         return sTrial
+
     # enddef
 
     # #####################################################################################################
@@ -127,7 +128,7 @@ class CTrialActions:
     # enddef
 
     # #####################################################################################################
-    def _UpdateResolvedActions(self):
+    def UpdateResolvedActions(self):
         sGlobalTrialFile: str = self._xLaunch.dicGlobalArgs.get("sTrialFile")
         lGlobalTrialFileOptions: list[str] = self._xLaunch.dicGlobalArgs.get("lTrialFileOptions")
 
