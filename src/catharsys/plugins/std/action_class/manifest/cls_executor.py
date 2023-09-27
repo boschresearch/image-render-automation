@@ -492,9 +492,9 @@ class CActionClassManifestExecutor(CActionClassExecutor):
     # Execute jobs with distribution over frames
     @logFunctionCall
     def _GetJobs_FramesConfigs(self, *, sId, dicJob) -> list[CConfigExecJob]:
-        iFrameFirst = self.dicActArgs.get("iFrameFirst", 0)
-        iFrameLast = self.dicActArgs.get("iFrameLast", 0)
-        iFrameStep = self.dicActArgs.get("iFrameStep", 1)
+        iFrameFirst = convert.DictElementToInt(self.dicActArgs, "iFrameFirst", iDefault=0)
+        iFrameLast = convert.DictElementToInt(self.dicActArgs, "iFrameLast", iDefault=0)
+        iFrameStep = convert.DictElementToInt(self.dicActArgs, "iFrameStep", iDefault=1)
 
         iFrameCnt = int(math.floor((iFrameLast - iFrameFirst) / iFrameStep)) + 1
         iFrameGroups = dicJob["iFrameGroups"]
@@ -602,9 +602,9 @@ class CActionClassManifestExecutor(CActionClassExecutor):
     # Execute jobs with distribution over frames
     @logFunctionCall
     def _GetJobs_PerFrameConfigs(self, *, sId, dicJob) -> list[CConfigExecJob]:
-        iFrameFirst = self.dicActArgs.get("iFrameFirst", 0)
-        iFrameLast = self.dicActArgs.get("iFrameLast", 0)
-        iFrameStep = self.dicActArgs.get("iFrameStep", 1)
+        iFrameFirst = convert.DictElementToInt(self.dicActArgs, "iFrameFirst", iDefault=0)
+        iFrameLast = convert.DictElementToInt(self.dicActArgs, "iFrameLast", iDefault=0)
+        iFrameStep = convert.DictElementToInt(self.dicActArgs, "iFrameStep", iDefault=1)
         iFrameCnt = int(math.floor((iFrameLast - iFrameFirst) / iFrameStep)) + 1
 
         iSubFrameGroups = dicJob["iFrameGroups"]
