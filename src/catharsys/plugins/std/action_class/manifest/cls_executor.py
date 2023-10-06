@@ -34,6 +34,7 @@ import numpy as np
 from datetime import datetime
 from pathlib import Path
 from typing import Optional, Callable
+from timeit import default_timer as timer
 
 import ison
 from ison.util.data import AddLocalGlobalVars
@@ -270,6 +271,7 @@ class CActionClassManifestExecutor(CActionClassExecutor):
 
         # sFpTrial = config.GetElementAtPath(self.dicTrial, "__locals__/filepath")
 
+        # dTimeStart = time.perf_counter()
         xLoopConfigs = CLoopConfigs(
             xPrjCfg=self.xPrjCfg,
             sId=self.dicTrial.get("sId"),
@@ -277,6 +279,8 @@ class CActionClassManifestExecutor(CActionClassExecutor):
             lScheme=self.lTrialCfgs,
         )
         iCfgCnt = xLoopConfigs.GetTotalStepCount()
+        # dTimeEnd = time.perf_counter()
+        # print("Init Job config and count total number: {:5.2f}s".format(dTimeEnd - dTimeStart))
 
         # Add the starting time of the action
         self.dicCfgVars["now"] = sDT
@@ -309,7 +313,7 @@ class CActionClassManifestExecutor(CActionClassExecutor):
             dicData = xLoopConfigs.GetData(self.xCML)
 
             # dTimeEnd = timer()
-            # print("GetData: {:5.2f}s".format(dTimeEnd - dTimeStart))
+            # print("GetData: {:5.3f}s       ".format(dTimeEnd - dTimeStart))
 
             # If returned data is none, then this config is filtered.
             # So we can continue with the next one.
@@ -343,6 +347,7 @@ class CActionClassManifestExecutor(CActionClassExecutor):
 
             sPathTrgMain = os.path.join(self.xPrjCfg.sActProdPath, dicData.get("sRelPathTrgMain"))
 
+            # dTimeStart = time.perf_counter()
             dicProcConfig = copy.deepcopy(self.dicActArgs)
 
             dicProcConfig.update(
@@ -358,6 +363,8 @@ class CActionClassManifestExecutor(CActionClassExecutor):
                     "sJobGroupId": sDT,
                 }
             )
+            # dTimeEnd = time.perf_counter()
+            # print("Creating config dict: {:5.2f}s".format(dTimeEnd - dTimeStart))
 
             lJobConfigs.append(dicProcConfig)
             # print("...finished")
@@ -485,9 +492,9 @@ class CActionClassManifestExecutor(CActionClassExecutor):
     # Execute jobs with distribution over frames
     @logFunctionCall
     def _GetJobs_FramesConfigs(self, *, sId, dicJob) -> list[CConfigExecJob]:
-        iFrameFirst = self.dicActArgs.get("iFrameFirst", 0)
-        iFrameLast = self.dicActArgs.get("iFrameLast", 0)
-        iFrameStep = self.dicActArgs.get("iFrameStep", 1)
+        iFrameFirst = convert.DictElementToInt(self.dicActArgs, "iFrameFirst", iDefault=0)
+        iFrameLast = convert.DictElementToInt(self.dicActArgs, "iFrameLast", iDefault=0)
+        iFrameStep = convert.DictElementToInt(self.dicActArgs, "iFrameStep", iDefault=1)
 
         iFrameCnt = int(math.floor((iFrameLast - iFrameFirst) / iFrameStep)) + 1
         iFrameGroups = dicJob["iFrameGroups"]
@@ -595,9 +602,9 @@ class CActionClassManifestExecutor(CActionClassExecutor):
     # Execute jobs with distribution over frames
     @logFunctionCall
     def _GetJobs_PerFrameConfigs(self, *, sId, dicJob) -> list[CConfigExecJob]:
-        iFrameFirst = self.dicActArgs.get("iFrameFirst", 0)
-        iFrameLast = self.dicActArgs.get("iFrameLast", 0)
-        iFrameStep = self.dicActArgs.get("iFrameStep", 1)
+        iFrameFirst = convert.DictElementToInt(self.dicActArgs, "iFrameFirst", iDefault=0)
+        iFrameLast = convert.DictElementToInt(self.dicActArgs, "iFrameLast", iDefault=0)
+        iFrameStep = convert.DictElementToInt(self.dicActArgs, "iFrameStep", iDefault=1)
         iFrameCnt = int(math.floor((iFrameLast - iFrameFirst) / iFrameStep)) + 1
 
         iSubFrameGroups = dicJob["iFrameGroups"]

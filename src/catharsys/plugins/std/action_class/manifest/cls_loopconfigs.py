@@ -28,29 +28,35 @@
 # Class that implements nested configuration loops based on a scheme
 import os
 import copy
-from pathlib import Path
+from dataclasses import dataclass
+
+# from pathlib import Path
 from anybase import path
 from catharsys.util import config
 from catharsys.util.cls_configcml import CConfigCML
 from catharsys.decs.decorator_log import logFunctionCall
-from catharsys.config.cls_project import CProjectConfig
+
+# from catharsys.config.cls_project import CProjectConfig
 import ison
 
 # from timeit import default_timer as timer
 
 
+@dataclass
+class CProcCache:
+    dicCfg: dict
+    bIsFullyProcessed: bool
+    dicVarGlobal: dict = None
+    setVarGlobalEval: set = None
+    dicVarRt: dict = None
+    setVarRtEval: set = None
+    dicVarFuncGlobal: dict = None
+
+
+# endclass
+
+
 class CLoopConfigs:
-    xPrjCfg: CProjectConfig = None
-    pathCfgFile: Path = None
-
-    lScheme: list = None
-    dicCfgCache: dict = None
-    dicProcCfgCache: dict = None
-
-    sId: str = None
-    sCfgPath: str = None
-    sCfgFilename: str = None
-
     #################################################################
     # Constructor
     def __init__(self, *, xPrjCfg, sId, sCfgFilePath, lScheme):
@@ -62,6 +68,9 @@ class CLoopConfigs:
         self.sCfgFilename = self.pathCfgFile.name
 
         self.lScheme = copy.deepcopy(lScheme)
+
+        self.dicCfgCache: dict = None
+        self.dicProcCfgCache: dict[str, CProcCache] = None
 
         # Initialize loop
         self.Init()
@@ -330,10 +339,12 @@ class CLoopConfigs:
             }
         # endfor
         # dTimeEnd = timer()
-        # print("Load configs: {}s".format(dTimeEnd - dTimeStart))
+        # print(">> Load configs: {}s".format(dTimeEnd - dTimeStart))
 
         # ##########################################################################################
         # ##########################################################################################
+
+        # dTimeStart = timer()
 
         sRelPathTrgMain = path.MakeNormPath((self.sId, lCfgIdFolders)).as_posix()
 
@@ -404,13 +415,19 @@ class CLoopConfigs:
             )
         # endfor
 
+        # dTimeEnd = timer()
+        # print(">> Prepare Vars: {}s".format(dTimeEnd - dTimeStart))
+
         ######################################################################
         # Process all config variables
 
         # dTimeStart = timer()
 
+        bDoPreProc: bool = False
+        iFirstProcPass: int = 0 if bDoPreProc is True else 1
+
         # Pre-process all configs first and then parse them normally.
-        for iProcPass in range(3):
+        for iProcPass in range(iFirstProcPass, 3):
             bPreProcessOnly = iProcPass == 0
 
             if iProcPass == 2:
@@ -435,6 +452,9 @@ class CLoopConfigs:
 
             # for sId, dicCfgMeta in dicCfgIdMeta.items():
             for sId in lIds:
+                bParseInPlace: bool = False
+                bIsFullyProcessed: bool = False
+
                 dicCfgMeta = dicCfgIdMeta[sId]
                 sDti = dicCfgMeta.get("sDTI")
                 iDataListIdx = dicCfgMeta.get("iDataListIdx")
@@ -445,8 +465,26 @@ class CLoopConfigs:
                 # Test whether data is in process cache
                 sProcCfgCacheHash = self._GetProcCfgCacheHash(sId, iLevelIdx, iDataListIdx)
                 # Load from cache only in process pass 0
-                if iProcPass == 0 and sProcCfgCacheHash in self.dicProcCfgCache:
-                    xCfg = copy.deepcopy(self.dicProcCfgCache[sProcCfgCacheHash])
+                if iProcPass >= iFirstProcPass and sProcCfgCacheHash in self.dicProcCfgCache:
+                    xProcCache = self.dicProcCfgCache[sProcCfgCacheHash]
+                    if xProcCache.bIsFullyProcessed is True:
+                        xCfg = xProcCache.dicCfg
+                        xCML.dicVarGlo.update(xProcCache.dicVarGlobal)
+                        xCML.setVarGloEval.update(xProcCache.setVarGlobalEval)
+                        xCML.dicVarFuncGlo.update(xProcCache.dicVarFuncGlobal)
+                        xCML.dicVarRtv.update(xProcCache.dicVarRt)
+                        xCML.setVarRtvEval.update(xProcCache.setVarRtEval)
+                        bIsFullyProcessed = True
+
+                        # print(f"{iProcPass}> {sId} [{iLevelIdx}, {iDataListIdx}]: Load from cache, fully processed")
+                    else:
+                        xCfg = copy.deepcopy(xProcCache.dicCfg)
+                        bParseInPlace = True
+                        # print(
+                        #     f"{iProcPass}> {sId} [{iLevelIdx}, {iDataListIdx}]: Load from cache, deep copy, parse in place"
+                        # )
+                    # endif
+
                 else:
                     xCfg = lCfgData[iDataListIdx]
                 # endif data in process cache
@@ -468,13 +506,39 @@ class CLoopConfigs:
                 # endif
 
                 try:
-                    dicCfg = xCML.Process(xCfg, sImportPath=sImportPath, bPreProcessOnly=bPreProcessOnly)
-                    lCfgData[iDataListIdx] = dicCfg
+                    if bIsFullyProcessed is True:
+                        lCfgData[iDataListIdx] = xCfg
+                    else:
+                        dicCfg = xCML.Process(
+                            xCfg,
+                            sImportPath=sImportPath,
+                            bPreProcessOnly=bPreProcessOnly,
+                            bInPlace=bParseInPlace,
+                        )
+                        lCfgData[iDataListIdx] = dicCfg
 
-                    # Cache a copy of the processed config in process pass 1.
-                    if iProcPass == 1:
-                        if sProcCfgCacheHash not in self.dicProcCfgCache:
-                            self.dicProcCfgCache[sProcCfgCacheHash] = copy.deepcopy(dicCfg)
+                        # print(
+                        #     f"{iProcPass}> {sId} [{iLevelIdx}, {iDataListIdx}]: Processed [full: {xCML.bIsFullyProcessed}]"
+                        # )
+
+                        # Cache a copy of the processed config in process pass 1.
+                        if iProcPass == 1:
+                            if sProcCfgCacheHash not in self.dicProcCfgCache:
+                                xProcCache = self.dicProcCfgCache[sProcCfgCacheHash] = CProcCache(
+                                    copy.deepcopy(dicCfg), xCML.bIsFullyProcessed
+                                )
+                                if xCML.bIsFullyProcessed is True:
+                                    xProcCache.dicVarGlobal = copy.deepcopy(xCML.dicVarGlo)
+                                    xProcCache.setVarGlobalEval = xCML.setVarGloEval.copy()
+                                    xProcCache.dicVarRt = copy.deepcopy(xCML.dicVarRtv)
+                                    xProcCache.setVarRtEval = xCML.setVarRtvEval.copy()
+                                    xProcCache.dicVarFuncGlobal = copy.deepcopy(xCML.dicVarFuncGlo)
+                                # endif
+
+                                # print(
+                                #     f"{iProcPass}> {sId} [{iLevelIdx}, {iDataListIdx}]: Store in cache [full: {xCML.bIsFullyProcessed}]"
+                                # )
+                            # endif
                         # endif
                     # endif
                 except ison.ParserError as xEx:
@@ -523,7 +587,7 @@ class CLoopConfigs:
         # endfor processing pass
 
         # dTimeEnd = timer()
-        # print("Process configs: {}s".format(dTimeEnd - dTimeStart))
+        # print(">> Process configs: {}s".format(dTimeEnd - dTimeStart))
 
         ######################################################################
         # Update dicVarData with processed configs
@@ -589,8 +653,8 @@ class CLoopConfigs:
         self.iTotalIdx = -1
 
         # Reset configuration file cache
-        self.dicCfgCache = {}
-        self.dicProcCfgCache = {}
+        self.dicCfgCache = dict()
+        self.dicProcCfgCache = dict()
 
     # enddef
 
