@@ -43,6 +43,7 @@ class CPathVarHandlerResult:
     pathScan: Path
     sName: str
     xData: Optional[Any] = None
+    sPathName: Optional[str] = None
 
 
 # endclass
@@ -172,6 +173,7 @@ class CPathStructure:
                         _iLevel=_iLevel,
                         _eType=xPathVar.eNodeType,
                         _xData=xResult.xData,
+                        _sPathName=xResult.sPathName
                     )
                     if xResult.pathScan is not None and len(lPathVarIds) > _iLevel + 1:
                         self.ScanFileSystem(

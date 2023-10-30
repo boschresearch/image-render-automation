@@ -227,7 +227,7 @@ class CProducts:
             if not pathItem.is_file() or xMatch is None:
                 continue
             # endif
-            yield CPathVarHandlerResult(pathItem, pathItem.name, (int(xMatch.group(1)), xMatch.group(2)))
+            yield CPathVarHandlerResult(pathItem, pathItem.stem, (int(xMatch.group(1)), xMatch.group(2)), pathItem.name)
         # endfor
 
     # enddef

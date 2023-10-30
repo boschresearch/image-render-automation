@@ -47,12 +47,20 @@ class CNode(anytree.NodeMixin):
         _iLevel: int,
         _eType: ENodeType,
         _xData: Optional[Any] = None,
+        _sPathName: Optional[str] = None,
     ):
         super().__init__()
         self.name = name
+        if _sPathName is not None:
+            self._sPathName = _sPathName
+        else:
+            self._sPathName = name
+        # endif
+
         self._iLevel: int = _iLevel
         self._eType: ENodeType = _eType
         self._xData: Any = _xData
+        
         self.parent = parent
         if children:
             self.children = children
@@ -139,7 +147,7 @@ class CNode(anytree.NodeMixin):
     def pathFS(self) -> Path:
         sName: str = ""
         lNames: list[str] = [
-            str(node.name) for node in self.path if node._eType in [ENodeType.PATH, ENodeType.ARTEFACT]
+            str(node._sPathName) for node in self.path if node._eType in [ENodeType.PATH, ENodeType.ARTEFACT]
         ]
         if len(lNames) > 0:
             sName = "/".join(lNames)
