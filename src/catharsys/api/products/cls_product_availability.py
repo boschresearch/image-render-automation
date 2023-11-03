@@ -20,13 +20,16 @@
 # </LICENSE>
 ###
 
-# from pathlib import Path
+from pathlib import Path
 from typing import Optional
+
+from anybase import file as anyfile
 
 # from catharsys.api.products.cls_products import CProducts
 from catharsys.api.products.cls_group import CGroup
-
 from catharsys.api.products.cls_node import CNode
+from catharsys.api.products.cls_path_structure import CPathVar
+
 from dataclasses import dataclass
 
 
@@ -201,7 +204,93 @@ class CProductAvailability:
             # endfor
         # endfor
 
-        return dicVarValMissing
+        dicMissing: dict[str, list] = {}
+        for sPath, setVals in dicVarValMissing.items():
+            if len(setVals) > 0 and next((self._IsInt(x) for x in setVals), None) is True:
+                lVals = [int(x) for x in setVals]
+            else:
+                lVals = list(setVals)
+            # endif
+            lVals.sort()
+            dicMissing[sPath] = lVals
+        # endfor
+
+        return dicMissing
+
+    # enddef
+
+    def _IsInt(self, _sVal: str) -> bool:
+        try:
+            iVal = int(_sVal)
+        except Exception:
+            return False
+        # endtry
+        return True
+
+    # enddef
+
+    def PrintMissingArtefactsGroupVarValues(
+        self, *, _sVarId: str, _lArtTypeIds: Optional[list[str]] = None, _bConcise: bool = False
+    ):
+        dicMissing = self.GetMissingArtefactsGroupVarValues(_sVarId, _lArtTypeIds)
+
+        sVarName = self._xGrp.xPathStruct.dicVars[_sVarId].sName
+
+        if isinstance(_lArtTypeIds, list) and len(_lArtTypeIds) > 0:
+            sArtNames = ", ".join(_lArtTypeIds)
+            print(
+                f"Artefact type(s) '{sArtNames}' missing for the following values of path variable '{sVarName}' [{_sVarId}]:"
+            )
+        else:
+            print(f"Any artefact types missing for the following values '{sVarName}' [{_sVarId}]:")
+        # endif
+        print("")
+
+        for sPath, lVals in dicMissing.items():
+            print(f"  Path: {sPath}")
+
+            if _bConcise is True and isinstance(lVals[0], int):
+                lCluster: list[str] = []
+                iStartVal = lVals[0]
+                iPrevVal = iStartVal
+                for iVal in lVals[1:]:
+                    if iVal > iPrevVal + 1:
+                        if iStartVal == iPrevVal:
+                            lCluster.append(f"{iStartVal}")
+                        else:
+                            lCluster.append(f"{iStartVal}-{iPrevVal}")
+                        # endif
+                        iStartVal = iVal
+                    # endif
+                    iPrevVal = iVal
+                # endfor
+                if iStartVal == iPrevVal:
+                    lCluster.append(f"{iStartVal}")
+                else:
+                    lCluster.append(f"{iStartVal}-{iPrevVal}")
+                # endif
+
+                print(f"  Values:\n{lCluster}\n")
+            else:
+                print(f"  Values:\n{lVals}\n")
+            # endif
+
+        # endfor
+
+    # enddef
+
+    def SaveMissingArtefactsGroupVarValues(
+        self, *, _pathFile: Path, _sVarId: str, _lArtTypeIds: Optional[list[str]] = None, _iIndent: int = -1
+    ):
+        dicData = {
+            "sDTI": "/catharsys/production/missing/single-var:1.0",
+            "sProjectId": self._xGrp.xProject.sId,
+            "sProdVarId": _sVarId,
+            "lArtefactTypeIds": _lArtTypeIds,
+            "mMissing": self.GetMissingArtefactsGroupVarValues(_sVarId, _lArtTypeIds),
+        }
+
+        anyfile.SaveJson(_pathFile, dicData, iIndent=_iIndent)
 
     # enddef
 

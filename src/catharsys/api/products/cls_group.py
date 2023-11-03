@@ -104,6 +104,11 @@ class CGroup:
     # enddef
 
     @property
+    def xProject(self) -> CProject:
+        return self._xProject
+    # enddef
+    
+    @property
     def xPathStruct(self) -> CPathStructure:
         return self._xPathStruct
 
