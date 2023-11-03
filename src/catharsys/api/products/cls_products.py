@@ -23,11 +23,13 @@
 import re
 import copy
 from pathlib import Path
-from typing import Iterator, Optional
+from typing import Iterator, Optional, Union
 
 from catharsys.api.cls_project import CProject
 
 from anybase import config
+from anybase import file as anyfile
+from anybase.cls_any_error import CAnyError_Message
 
 from .cls_path_structure import CPathVar, EPathVarType, CPathVarHandlerResult
 from .cls_group import CGroup
@@ -121,13 +123,27 @@ class CProducts:
     # enddef
 
     # #####################################################################################################
-    def FromFile(self, _pathConfig: Path):
+    def FromFile(self, _pathConfig: Path, *, _bIgnoreGroupExceptions: bool = False):
+        dicExceptions: dict[str, str] = dict()
         self._dicCfg = config.Load(_pathConfig, sDTI="/catharsys/production:1")
         dicGroups = self._dicCfg["mGroups"]
         for sGroup in dicGroups:
-            self._dicGroups[sGroup] = CGroup(_sId=sGroup, _prjX=self._xProject, _dicPathSystemVars=self._dicSystemVars)
-            self._dicGroups[sGroup].FromConfig(dicGroups[sGroup])
+            try:
+                self._dicGroups[sGroup] = CGroup(
+                    _sId=sGroup, _prjX=self._xProject, _dicPathSystemVars=self._dicSystemVars
+                )
+                self._dicGroups[sGroup].FromConfig(dicGroups[sGroup])
+            except Exception as xEx:
+                if _bIgnoreGroupExceptions is True:
+                    dicExceptions[sGroup] = str(xEx)
+                    del self._dicGroups[sGroup]
+                else:
+                    raise CAnyError_Message(sMsg=f"Error parsing group '{sGroup}'", xChildEx=xEx)
+                # endif
+            # endtry
         # endfor
+
+        return dicExceptions
 
     # enddef
 
@@ -144,6 +160,56 @@ class CProducts:
             # endif
             xGrp.ScanArtefacts()
         # endif
+
+    # enddef
+
+    # ######################################################################################################
+    def SerializeScan(self, _xFilePath: Union[str, list, tuple, Path]):
+        dicGroups: dict[str, list[tuple]] = dict()
+        for sGroup in self._dicGroups:
+            dicGroups[sGroup] = self._dicGroups[sGroup].SerializeScan()
+        # endfor
+
+        dicData = {
+            "sDTI": "/catharsys/production/scan:1.0",
+            "sProjectId": self._xProject.sId,
+            "mGroups": dicGroups,
+        }
+
+        anyfile.SavePickle(_xFilePath, dicData)
+
+    # enddef
+
+    # ######################################################################################################
+    def DeserializeScan(self, _xFilePath: Union[str, list, tuple, Path]):
+        dicData = anyfile.LoadPickle(_xFilePath)
+        if not config.IsConfigType(dicData, "/catharsys/production/scan:1"):
+            raise RuntimeError("Invalid file type")
+        # endif
+
+        sProjectId = dicData.get("sProjectId")
+        if sProjectId is None:
+            raise RuntimeError("No project id specified in file")
+        # endif
+
+        if sProjectId != self._xProject.sId:
+            raise RecursionError(
+                f"File contains product scan for project '{sProjectId}'. Expected project '{self._xProject.sId}'"
+            )
+        # endif
+
+        dicGroups = dicData.get("mGroups")
+        if dicGroups is None:
+            raise RuntimeError("No group data given in product scan file")
+        # endif
+
+        for sGroup in dicGroups:
+            if sGroup not in self._dicGroups:
+                print(f"WARNING: Group '{sGroup}' given in scan not found in current configuration")
+            # endif
+
+            self._dicGroups[sGroup].DeserializeScan(dicGroups[sGroup])
+        # endfor
 
     # enddef
 

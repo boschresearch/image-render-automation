@@ -26,7 +26,7 @@ from pathlib import Path
 from typing import Optional, Any
 
 
-class ENodeType(enum.Enum):
+class ENodeType(int, enum.Enum):
     ROOT = enum.auto()
     GROUP = enum.auto()
     ARTGROUP = enum.auto()
@@ -60,7 +60,7 @@ class CNode(anytree.NodeMixin):
         self._iLevel: int = _iLevel
         self._eType: ENodeType = _eType
         self._xData: Any = _xData
-        
+
         self.parent = parent
         if children:
             self.children = children
