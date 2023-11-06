@@ -26,7 +26,7 @@ import json
 from pathlib import Path
 from dataclasses import dataclass
 import anytree
-from typing import Union
+from typing import Union, Optional, Callable
 from anytree.exporter import DictExporter
 
 from catharsys.api.cls_project import CProject
@@ -106,8 +106,9 @@ class CGroup:
     @property
     def xProject(self) -> CProject:
         return self._xProject
+
     # enddef
-    
+
     @property
     def xPathStruct(self) -> CPathStructure:
         return self._xPathStruct
@@ -256,7 +257,17 @@ class CGroup:
     # enddef
 
     # ######################################################################################################
-    def ScanArtefacts(self):
+    def ScanArtefacts(
+        self,
+        *,
+        _funcStatus: Optional[Callable[[str], None]] = None,
+        _funcIterInit: Optional[Callable[[str, int], None]] = None,
+        _funcIterUpdate: Optional[Callable[[int], None]] = None,
+    ):
+        if _funcStatus is not None:
+            _funcStatus("Scanning group paths...")
+        # endif
+
         # Scan group path structure
         pathScan: Path = None
         self._xTree = CNode(self._sId, _iLevel=0, _eType=ENodeType.GROUP, _xData=self)
@@ -293,12 +304,30 @@ class CGroup:
         # endif
 
         tGroupLeafNodes: tuple[CNode] = tuple(anytree.PreOrderIter(self._xTree, filter_=lambda node: node.is_leaf))
+
+        iGrpPathCnt: int = 0
+        if _funcStatus is not None:
+            iGrpPathCnt = len(tGroupLeafNodes)
+            _funcStatus(f"Scanning artefacts for {iGrpPathCnt} group paths...")
+        # endif
+
+        bHasFuncIter: bool = _funcIterInit is not None and _funcIterUpdate is not None
+
         # Scan all artefact types
         sArtTypeId: str = ""
         for sArtTypeId in self._dicArtTypes:
             xArtType: CArtefactType = self._dicArtTypes[sArtTypeId]
+
+            if bHasFuncIter is not None:
+                _funcIterInit(f"Artefact '{xArtType.sName}'", iGrpPathCnt)
+            # endif
+
             xNode: CNode = None
-            for xNode in tGroupLeafNodes:
+            for iIdx, xNode in enumerate(tGroupLeafNodes):
+                if bHasFuncIter:
+                    _funcIterUpdate(iIdx)
+                # endif
+
                 xArtTypeNode = CNode(sArtTypeId, parent=xNode, _iLevel=0, _eType=ENodeType.ARTGROUP, _xData=xArtType)
                 xArtType.xPathStruct.ScanFileSystem(
                     _pathScan=xNode.pathFS,
@@ -306,7 +335,9 @@ class CGroup:
                     _iLevel=0,
                 )
             # endfor
-
+            if bHasFuncIter:
+                _funcIterUpdate(iGrpPathCnt)
+            # endif
         # endfor
 
     # enddef

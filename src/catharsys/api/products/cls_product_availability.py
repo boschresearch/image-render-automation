@@ -230,11 +230,25 @@ class CProductAvailability:
     # enddef
 
     def PrintMissingArtefactsGroupVarValues(
-        self, *, _sVarId: str, _lArtTypeIds: Optional[list[str]] = None, _bConcise: bool = False
+        self,
+        *,
+        _sVarId: str,
+        _lArtTypeIds: Optional[list[str]] = None,
+        _bConcise: bool = False,
+        _dicMissing: Optional[dict] = None,
     ):
-        dicMissing = self.GetMissingArtefactsGroupVarValues(_sVarId, _lArtTypeIds)
+        if _dicMissing is None:
+            dicMissing = self.GetMissingArtefactsGroupVarValues(_sVarId, _lArtTypeIds)
+        else:
+            dicMissing = _dicMissing
+        # endif
 
         sVarName = self._xGrp.xPathStruct.dicVars[_sVarId].sName
+
+        if len(dicMissing) == 0:
+            print("All artefacts available")
+            return
+        # endif
 
         if isinstance(_lArtTypeIds, list) and len(_lArtTypeIds) > 0:
             sArtNames = ", ".join(_lArtTypeIds)
@@ -280,14 +294,26 @@ class CProductAvailability:
     # enddef
 
     def SaveMissingArtefactsGroupVarValues(
-        self, *, _pathFile: Path, _sVarId: str, _lArtTypeIds: Optional[list[str]] = None, _iIndent: int = -1
+        self,
+        *,
+        _pathFile: Path,
+        _sVarId: str,
+        _lArtTypeIds: Optional[list[str]] = None,
+        _iIndent: int = -1,
+        _dicMissing: Optional[dict] = None,
     ):
+        if _dicMissing is None:
+            dicMissing = self.GetMissingArtefactsGroupVarValues(_sVarId, _lArtTypeIds)
+        else:
+            dicMissing = _dicMissing
+        # endif
+
         dicData = {
             "sDTI": "/catharsys/production/missing/single-var:1.0",
             "sProjectId": self._xGrp.xProject.sId,
             "sProdVarId": _sVarId,
             "lArtefactTypeIds": _lArtTypeIds,
-            "mMissing": self.GetMissingArtefactsGroupVarValues(_sVarId, _lArtTypeIds),
+            "mMissing": dicMissing,
         }
 
         anyfile.SaveJson(_pathFile, dicData, iIndent=_iIndent)

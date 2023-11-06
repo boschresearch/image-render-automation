@@ -25,6 +25,7 @@
 
 import re
 from pathlib import Path
+from tqdm import tqdm
 
 # from anybase import file as anyfile
 from anybase import path as anypath
@@ -45,6 +46,31 @@ from catharsys.api.products.cls_products import CProducts
 
 
 ####################################################################
+
+xIterBar: tqdm = None
+
+
+def _ScanStatus(sText: str):
+    print(sText, flush=True)
+
+
+# enddef
+
+
+def _ScanIterInit(sText: str, iCount: int):
+    global xIterBar
+    xIterBar = tqdm(total=iCount, desc=sText)
+
+
+# enddef
+
+
+def _ScanIterUpdate(iIdx: int):
+    global xIterBar
+    xIterBar.update(iIdx)
+
+
+# enddef
 
 
 def RunScan(
@@ -72,7 +98,12 @@ def RunScan(
         # endif
 
         print("Scanning for artefacts...")
-        xProds.ScanArtefacts(_sGroupId=_sGroup)
+        xProds.ScanArtefacts(
+            _sGroupId=_sGroup,
+            _funcStatus=_ScanStatus,
+            _funcIterInit=_ScanIterInit,
+            _funcIterUpdate=_ScanIterUpdate,
+        )
 
         if _sOutFile is None:
             if _sGroup is None:

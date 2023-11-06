@@ -25,7 +25,7 @@
 
 
 # end class
-g_sCmdDesc = "Catharsys Products Scan"
+g_sCmdDesc = "Catharsys Products Analysis"
 
 
 ####################################################################
@@ -45,30 +45,20 @@ def AddArgParseArguments(_parseArgs):
 
     _parseArgs.add_argument(
         "-p",
-        "--prod-cfg",
+        "--prod-ana",
         nargs=1,
-        dest="prod_config",
-        # default=[None],
-        help="The production configuration file",
+        dest="prod_ana_config",
+        help="The production analysis configuration file",
         required=True,
     )
 
     _parseArgs.add_argument(
-        "-o",
-        "--output",
+        "-s",
+        "--scan-file",
         nargs=1,
-        dest="output_file",
+        dest="scan_file",
         default=[None],
-        help="Overrides the automatically created output filename",
-    )
-
-    _parseArgs.add_argument(
-        "-g",
-        "--group",
-        nargs=1,
-        dest="group",
-        default=[None],
-        help="Specify production group from production configuration to scan",
+        help="Specify the file system scan file to use",
     )
 
 
@@ -77,16 +67,15 @@ def AddArgParseArguments(_parseArgs):
 
 ####################################################################
 def RunCmd(_argsCmd, _lArgs):
-    from catharsys.action.cmd import prod_scan_impl as impl
+    from catharsys.action.cmd import prod_analyze_impl as impl
     from catharsys.setup import args
 
     argsSubCmd = args.ParseCmdArgs(_argsCmd=_argsCmd, _lArgs=_lArgs, _funcAddArgs=AddArgParseArguments)
 
-    impl.RunScan(
+    impl.RunAnalysis(
         _sConfig=argsSubCmd.config_folder[0],
-        _sProdCfgFile=argsSubCmd.prod_config[0],
-        _sOutFile=argsSubCmd.output_file[0],
-        _sGroup=argsSubCmd.group[0],
+        _sProdAnaCfgFile=argsSubCmd.prod_ana_config[0],
+        _sScanFile=argsSubCmd.scan_file[0],
     )
 
 

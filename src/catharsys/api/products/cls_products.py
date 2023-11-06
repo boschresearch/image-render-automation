@@ -23,7 +23,7 @@
 import re
 import copy
 from pathlib import Path
-from typing import Iterator, Optional, Union
+from typing import Iterator, Optional, Union, Callable
 
 from catharsys.api.cls_project import CProject
 
@@ -148,17 +148,40 @@ class CProducts:
     # enddef
 
     # #####################################################################################################
-    def ScanArtefacts(self, *, _sGroupId: Optional[str] = None):
+    def ScanArtefacts(
+        self,
+        *,
+        _sGroupId: Optional[str] = None,
+        _funcStatus: Optional[Callable[[str], None]] = None,
+        _funcIterInit: Optional[Callable[[str, int], None]] = None,
+        _funcIterUpdate: Optional[Callable[[int], None]] = None,
+    ):
         if _sGroupId is None:
             for sGroup in self._dicGroups:
-                self._dicGroups[sGroup].ScanArtefacts()
+                if _funcStatus is not None:
+                    _funcStatus(f"Scanning for production group '{sGroup}'...")
+                # endif
+
+                self._dicGroups[sGroup].ScanArtefacts(
+                    _funcStatus=_funcStatus,
+                    _funcIterInit=_funcIterInit,
+                    _funcIterUpdate=_funcIterUpdate,
+                )
             # endfor
         else:
             xGrp = self._dicGroups.get(_sGroupId)
             if xGrp is None:
                 raise RuntimeError(f"Group '{_sGroupId}' not available")
             # endif
-            xGrp.ScanArtefacts()
+            if _funcStatus is not None:
+                _funcStatus(f"Scanning for production group '{_sGroupId}'...")
+            # endif
+
+            xGrp.ScanArtefacts(
+                _funcStatus=_funcStatus,
+                _funcIterInit=_funcIterInit,
+                _funcIterUpdate=_funcIterUpdate,
+            )
         # endif
 
     # enddef
