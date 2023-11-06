@@ -59,16 +59,19 @@ def _ScanStatus(sText: str):
 
 def _ScanIterInit(sText: str, iCount: int):
     global xIterBar
-    xIterBar = tqdm(total=iCount, desc=sText)
+    xIterBar = tqdm(total=int(iCount), desc=sText, leave=True)
 
 
 # enddef
 
 
-def _ScanIterUpdate(iIdx: int):
+def _ScanIterUpdate(iIncrement: int, bEnd: bool = False):
     global xIterBar
-    xIterBar.update(iIdx)
-
+    if bEnd is True:
+        xIterBar.close()
+    else:
+        xIterBar.update(int(iIncrement))
+    # endif
 
 # enddef
 

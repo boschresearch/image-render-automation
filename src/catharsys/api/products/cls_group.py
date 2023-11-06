@@ -323,9 +323,9 @@ class CGroup:
             # endif
 
             xNode: CNode = None
-            for iIdx, xNode in enumerate(tGroupLeafNodes):
+            for xNode in tGroupLeafNodes:
                 if bHasFuncIter:
-                    _funcIterUpdate(iIdx)
+                    _funcIterUpdate(1)
                 # endif
 
                 xArtTypeNode = CNode(sArtTypeId, parent=xNode, _iLevel=0, _eType=ENodeType.ARTGROUP, _xData=xArtType)
@@ -336,7 +336,7 @@ class CGroup:
                 )
             # endfor
             if bHasFuncIter:
-                _funcIterUpdate(iGrpPathCnt)
+                _funcIterUpdate(0, True)
             # endif
         # endfor
 
