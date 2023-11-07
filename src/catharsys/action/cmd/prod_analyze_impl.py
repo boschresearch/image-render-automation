@@ -63,10 +63,24 @@ def RunAnalysis(
         # #####################################################################
         # Load analysis configuration
         pathProdAnaCfg = anypath.MakeNormPath(_sProdAnaCfgFile)
+
         if not pathProdAnaCfg.is_absolute():
             pathProdAnaCfg = xPrj.xConfig.pathLaunch / pathProdAnaCfg
         # endif
-        pathProdAnaCfg = anypath.ProvideReadFilepathExt(pathProdAnaCfg, [".ison", ".json", ".json5"])
+
+        pathProdAnaCfgExt = anypath.ProvideReadFilepathExt(pathProdAnaCfg, [".ison", ".json", ".json5"])
+        if pathProdAnaCfgExt is None:
+            if len(pathProdAnaCfg.suffix) > 0:
+                raise RuntimeError(f"Production analysis file not found: {(pathProdAnaCfg.as_posix())}")
+            else:
+                raise RuntimeError(
+                    f"Production analysis file not found: {(pathProdAnaCfg.as_posix())}[.ison | .json | .json5]"
+                )
+            # endif
+
+        else:
+            pathProdAnaCfg = pathProdAnaCfgExt
+        # endif
 
         dicFpVars = xPrj.xConfig.GetFilepathVarDict(pathProdAnaCfg)
         dicAnaCfg = config.Load(pathProdAnaCfg, sDTI="/catharsys/production/analyze:1.*")
@@ -145,7 +159,42 @@ def RunAnalysis(
             lGrpVarValLists = xGrp.GetGroupVarValueLists()
             dicArtVarValLists, dicArtVarsTypeList = xGrp.GetArtefactVarValues(lGrpVarValLists)
 
-            # TODO: Adapt variable lists based on configuration
+            lExpGrpVarVals: list = dicAna.get("lGroupVarValues")
+            if not isinstance(lExpGrpVarVals, list):
+                raise RuntimeError("Element 'lGroupVarValues' must be a list")
+            # endif
+
+            lEffExpGrpVarVals: list = []
+            for xVal in lExpGrpVarVals:
+                if isinstance(xVal, list):
+                    if len(xVal) == 2:
+                        iFirst, iLast = xVal
+                        if not isinstance(iFirst, int) or not isinstance(iLast, int):
+                            raise RuntimeError(f"Expect both elements in range to be integers: {xVal}")
+                        # endif
+                        lEffExpGrpVarVals.extend(list(range(iFirst, iLast + 1)))
+                    elif len(xVal) == 3:
+                        iFirst, iLast, iStep = xVal
+                        if not isinstance(iFirst, int) or not isinstance(iLast, int) or not isinstance(iStep, int):
+                            raise RuntimeError(f"Expect all elements in range with step size to be integers: {xVal}")
+                        # endif
+                        lEffExpGrpVarVals.extend(list(range(iFirst, iLast + 1, iStep)))
+                    else:
+                        raise RuntimeError(f"Expect range element to have 2 or 3 integer elements: {xVal}")
+                    # endif
+                else:
+                    lEffExpGrpVarVals.append(xVal)
+                # endif
+            # endfor
+
+            if sGroupVarId not in xGrp.xPathStruct.lPathVarIds:
+                raise RuntimeError(
+                    f"Group variable '{sGroupVarId}' not found production configuration group '{sGroupId}'"
+                )
+            # endif
+
+            iVarIdx = xGrp.xPathStruct.lPathVarIds.index(sGroupVarId)
+            lGrpVarValLists[iVarIdx] = lEffExpGrpVarVals
 
             xProdAvail = CProductAvailability(
                 _xGroup=xGrp, _lSelGrpVarValLists=lGrpVarValLists, _dicSelArtVarValLists=dicArtVarValLists
