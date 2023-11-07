@@ -46,38 +46,38 @@ Here is an example `production.json`:
 
 ```json
 {
-    sDTI: "/catharsys/production:1.0",
+    "sDTI": "/catharsys/production:1.0",
 
-    mGroups: {
-        cfg3: {
-            sName: "Config 3",
-            sPathStructure: "!production/!rq/!project/cfg-03-test/?camera/?cfg",
-            mVars: {
+    "mGroups": {
+        "cfg3": {
+            "sName": "Config 3",
+            "sPathStructure": "!production/!rq/!project/cfg-03-test/?camera/?cfg",
+            "mVars": {
                 "cfg-type": {
-                    sName: "Config Type",
+                    "sName": "Config Type",
                 },
                 "camera": {
-                    sName: "Camera",
+                    "sName": "Camera",
                 },
                 "cfg": {
-                    sName: "Config Index",
+                    "sName": "Config Index",
                 },
             },
-            mArtefacts: {
-                images: {
-                    sDTI: "/catharsys/production/artefact/image/png:1.0",
-                    sName: "Image",
-                    sPathStructure: "Image/!frame",
+            "mArtefacts": {
+                "images": {
+                    "sDTI": "/catharsys/production/artefact/image/png:1.0",
+                    "sName": "Image",
+                    "sPathStructure": "Image/!frame",
                 },
-                label: {
-                    sDTI: "/catharsys/production/artefact/image/png:1.0",
-                    sName: "Label",
-                    sPathStructure: "AT_Label/full_res/Preview/!frame",
+                "label": {
+                    "sDTI": "/catharsys/production/artefact/image/png:1.0",
+                    "sName": "Label",
+                    "sPathStructure": "AT_Label/full_res/Preview/!frame",
                 },
-                depth: {
-                    sDTI: "/catharsys/production/artefact/image/png:1.0",
-                    sName: "Depth",
-                    sPathStructure: "AT_Depth/full_res/Preview/!frame",
+                "depth": {
+                    "sDTI": "/catharsys/production/artefact/image/png:1.0",
+                    "sName": "Depth",
+                    "sPathStructure": "AT_Depth/full_res/Preview/!frame",
                 },
             } // end artefacts
         }, // end view group
@@ -100,50 +100,50 @@ Currently, you can only analyze the file system scan for missing artefacts w.r.t
 
 ```json
 {
-    sDTI: "/catharsys/production/analyze:1.0",
+    "sDTI": "/catharsys/production/analyze:1.0",
 
     // specify the production configuration file.
-    sPathProdConfig: "production.json5",
+    "sPathProdConfig": "production.json5",
 
     // List of analysis tests for missing artefacts
-    lAnalyzeMissing: [
+    "lAnalyzeMissing": [
         {
             // The name of this analysis
-            sName: "Images",
+            "sName": "Images",
             // The group id of the production configuration we are referring to
-            sGroupId: "cfg3",
+            "sGroupId": "cfg3",
             // The id of the group path variable, for which to report missing artefacts
-            sGroupVarId: "cfg",
+            "sGroupVarId": "cfg",
             // The list of artefact ids as defined in the production configuration to look for.
             // If this is an empty list, all artefacts specified in the production configuration
             // are tested for.
-            lArtTypeIds: ["images"],
+            "lArtTypeIds": ["images"],
 
             // The expected values for the variable given in 'sGroupVarId'
             // This list can be simply a list of strings or integers specifying the expected elements.
             // For integers, a list element inside the list specifies a range.
             // For example, [[1,4]] = [1,2,3,4]
-            lGroupVarValues: [[1,10]],
+            "lGroupVarValues": [[1,10]],
 
             // optional, if defined (even as empty dictionary), the missing data
             // output is printed to stdout
-            mPrint: {
+            "mPrint": {
                 // optional, if true prints ranges of consecutive integer indices
                 //           as list elements with first and last index.
                 //           For example, instead of printing [3,4,5,6] it prints [[3,6]].
                 //           Another example, [3,6,7,8,9] becomes [3,[6,9]].
-                bConcise: true,
+                "bConcise": true,
             },
 
             // optional, if defined (even as empty dictionary), the missing data
             // output is saved to an automatically generated filename.
-            mSave: {
+            "mSave": {
                 // optional, if this is not specified, an output name is generated automatically.
-                // sPath: "${path-workspace}/missing.json",
+                // "sPath": "${path-workspace}/missing.json",
                 
                 // optional, how to indent the json output. 
                 // The default is -1, which means no indentation.
-                // iIndent: 2,
+                // "iIndent": 2,
             }
         },
     ],
@@ -160,7 +160,7 @@ The output of this call could look like this:
 
 <img style="width: 800px; padding-left: 20px; padding-right: 20px;border: 5px solid;" src="assets/analysis-output-01.png">
 
-The analysis actually found that all expected 10 configurations are missing for render quality 4 (`rq0004`) and configurations 3 to 10 are missing for render quality 256 (`rq0256`). If you are only interested in one of the render qualities, then replace the `!rq` variable in the production configuration with the corresponding fixed folder name, e.g. `rq0256`.
+The analysis actually found that all expected 10 configurations (as specified in `lGroupVarValues`) are missing for render quality 4 (`rq0004`) and configurations 3 to 10 are missing for render quality 256 (`rq0256`). If you are only interested in one of the render qualities, then replace the `!rq` variable in the production configuration with the corresponding fixed folder name, e.g. `rq0256`.
 
 The analysis result is also stored in a json file. You can use this to re-render a set of configuration indices.
 
