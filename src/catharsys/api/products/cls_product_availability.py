@@ -270,7 +270,7 @@ class CProductAvailability:
                 for iVal in lVals[1:]:
                     if iVal > iPrevVal + 1:
                         if iStartVal == iPrevVal:
-                            lCluster.append(f"{iStartVal}")
+                            lCluster.append(iStartVal)
                         elif iStartVal + 1 == iPrevVal:
                             lCluster.extend([iStartVal, iPrevVal])
                         else:
@@ -281,7 +281,7 @@ class CProductAvailability:
                     iPrevVal = iVal
                 # endfor
                 if iStartVal == iPrevVal:
-                    lCluster.append(f"{iStartVal}")
+                    lCluster.append(iStartVal)
                 elif iStartVal + 1 == iPrevVal:
                     lCluster.extend([iStartVal, iPrevVal])
                 else:
