@@ -318,13 +318,13 @@ class CGroup:
         for sArtTypeId in self._dicArtTypes:
             xArtType: CArtefactType = self._dicArtTypes[sArtTypeId]
 
-            if bHasFuncIter is not None:
+            if bHasFuncIter is True:
                 _funcIterInit(f"Artefact '{xArtType.sName}'", iGrpPathCnt)
             # endif
 
             xNode: CNode = None
             for xNode in tGroupLeafNodes:
-                if bHasFuncIter:
+                if bHasFuncIter is True:
                     _funcIterUpdate(1)
                 # endif
 
@@ -335,7 +335,7 @@ class CGroup:
                     _iLevel=0,
                 )
             # endfor
-            if bHasFuncIter:
+            if bHasFuncIter is True:
                 _funcIterUpdate(0, True)
             # endif
         # endfor
