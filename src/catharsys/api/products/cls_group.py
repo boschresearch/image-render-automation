@@ -21,13 +21,18 @@
 ###
 
 import re
+import json
+
 from pathlib import Path
 from dataclasses import dataclass
 import anytree
+from typing import Union, Optional, Callable
+from anytree.exporter import DictExporter
 
 from catharsys.api.cls_project import CProject
 
 from anybase import config
+from anybase import file as anyfile
 
 from .cls_node import CNode, ENodeType
 from .cls_path_structure import CPathStructure, CPathVar, EPathVarType
@@ -40,6 +45,19 @@ class CArtefactType:
     lType: list[str] = None
     xPathStruct: CPathStructure = None
     dicMeta: dict = None
+
+
+# endclass
+
+
+class CJsonNodeEncoder(json.JSONEncoder):
+    def default(self, _objX):
+        if isinstance(_objX, CArtefactType):
+            return f"CArtefactType({_objX.sId})"
+        # endif
+        return super().default(_objX)
+
+    # enddef
 
 
 # endclass
@@ -82,6 +100,12 @@ class CGroup:
             return False
         # endif
         return len(self._xTree.children) > 0
+
+    # enddef
+
+    @property
+    def xProject(self) -> CProject:
+        return self._xProject
 
     # enddef
 
@@ -159,7 +183,91 @@ class CGroup:
     # enddef
 
     # ######################################################################################################
-    def ScanArtefacts(self):
+    def _DoSerializeNode(self, _xNode: CNode) -> tuple:
+        lChildren: list[tuple] = []
+        for xChild in _xNode.children:
+            lChildren.append(self._DoSerializeNode(xChild))
+        # endfor
+
+        xData = None
+        if isinstance(_xNode._xData, CArtefactType):
+            xData = f"CArtefactType({_xNode._xData.sId})"
+        else:
+            xData = _xNode._xData
+        # endif
+
+        if _xNode.name == _xNode._sPathName:
+            sPathName = None
+        else:
+            sPathName = _xNode._sPathName
+        # endif
+
+        return (_xNode.name, sPathName, _xNode._iLevel, int(_xNode._eType), xData, lChildren)
+
+    # enddef
+
+    # ######################################################################################################
+    def SerializeScan(self) -> list[tuple]:
+        lChildren = []
+        for xChild in self._xTree.children:
+            lChildren.append(self._DoSerializeNode(xChild))
+        # endfor
+
+        return lChildren
+
+    # enddef
+
+    # ######################################################################################################
+    def _DoDeserializeNode(self, _xParent: CNode, _tData: tuple):
+        sName: str = _tData[0]
+        sPathName: str = _tData[1]
+        iLevel: int = _tData[2]
+        iType: int = _tData[3]
+        xData = _tData[4]
+        lChildren: list[tuple] = _tData[5]
+
+        if sPathName is None:
+            sPathName = sName
+        # endif
+
+        xNode: CNode
+        if isinstance(xData, str) and xData.startswith("CArtefactType("):
+            xArtType = self._dicArtTypes.get(sName)
+            if xArtType is None:
+                raise RuntimeError("Invalid artefact type '{sName}'")
+            # endif
+            xNode = CNode(sName, parent=_xParent, _iLevel=0, _eType=ENodeType.ARTGROUP, _xData=xArtType)
+        else:
+            xNode = CNode(sName, parent=_xParent, _iLevel=iLevel, _eType=iType, _sPathName=sPathName, _xData=xData)
+        # endif
+
+        for tChild in lChildren:
+            self._DoDeserializeNode(xNode, tChild)
+        # endfor
+
+    # enddef
+
+    # ######################################################################################################
+    def DeserializeScan(self, _lChildren: list[tuple]):
+        self._xTree = CNode(self._sId, _iLevel=0, _eType=ENodeType.GROUP, _xData=self)
+        for tChild in _lChildren:
+            self._DoDeserializeNode(self._xTree, tChild)
+        # endfor
+
+    # enddef
+
+    # ######################################################################################################
+    def ScanArtefacts(
+        self,
+        *,
+        _funcStatus: Optional[Callable[[str], None]] = None,
+        _funcIterInit: Optional[Callable[[str, int], None]] = None,
+        _funcIterUpdate: Optional[Callable[[int], None]] = None,
+    ):
+        if _funcStatus is not None:
+            _funcStatus("Scanning group paths...")
+        # endif
+
         # Scan group path structure
         pathScan: Path = None
         self._xTree = CNode(self._sId, _iLevel=0, _eType=ENodeType.GROUP, _xData=self)
@@ -196,12 +304,30 @@ class CGroup:
         # endif
 
         tGroupLeafNodes: tuple[CNode] = tuple(anytree.PreOrderIter(self._xTree, filter_=lambda node: node.is_leaf))
+
+        iGrpPathCnt: int = 0
+        if _funcStatus is not None:
+            iGrpPathCnt = len(tGroupLeafNodes)
+            _funcStatus(f"Scanning artefacts for {iGrpPathCnt} group paths...")
+        # endif
+
+        bHasFuncIter: bool = _funcIterInit is not None and _funcIterUpdate is not None
+
         # Scan all artefact types
         sArtTypeId: str = ""
         for sArtTypeId in self._dicArtTypes:
             xArtType: CArtefactType = self._dicArtTypes[sArtTypeId]
+
+            if bHasFuncIter is True:
+                _funcIterInit(f"Artefact '{xArtType.sName}'", iGrpPathCnt)
+            # endif
+
             xNode: CNode = None
             for xNode in tGroupLeafNodes:
+                if bHasFuncIter is True:
+                    _funcIterUpdate(1)
+                # endif
+
                 xArtTypeNode = CNode(sArtTypeId, parent=xNode, _iLevel=0, _eType=ENodeType.ARTGROUP, _xData=xArtType)
                 xArtType.xPathStruct.ScanFileSystem(
                     _pathScan=xNode.pathFS,
@@ -209,7 +335,9 @@ class CGroup:
                     _iLevel=0,
                 )
             # endfor
-
+            if bHasFuncIter is True:
+                _funcIterUpdate(0, True)
+            # endif
         # endfor
 
     # enddef
