@@ -262,6 +262,7 @@ class CProductAvailability:
 
         for sPath, lVals in dicMissing.items():
             print(f"  Path: {sPath}")
+            iMissingCnt: int = 0
 
             if _bConcise is True and isinstance(lVals[0], int):
                 lCluster: list[str] = []
@@ -271,10 +272,13 @@ class CProductAvailability:
                     if iVal > iPrevVal + 1:
                         if iStartVal == iPrevVal:
                             lCluster.append(iStartVal)
+                            iMissingCnt += 1
                         elif iStartVal + 1 == iPrevVal:
                             lCluster.extend([iStartVal, iPrevVal])
+                            iMissingCnt += 2
                         else:
                             lCluster.append([iStartVal, iPrevVal])
+                            iMissingCnt += iPrevVal - iStartVal + 1
                         # endif
                         iStartVal = iVal
                     # endif
@@ -282,15 +286,22 @@ class CProductAvailability:
                 # endfor
                 if iStartVal == iPrevVal:
                     lCluster.append(iStartVal)
+                    iMissingCnt += 1
                 elif iStartVal + 1 == iPrevVal:
                     lCluster.extend([iStartVal, iPrevVal])
+                    iMissingCnt += 2
                 else:
                     lCluster.append([iStartVal, iPrevVal])
+                    iMissingCnt += iPrevVal - iStartVal + 1
                 # endif
 
+                print(f"  Missing values count: {iMissingCnt}")
                 print(f"  Values:\n{lCluster}\n")
             else:
+                iMissingCnt = len(lVals)
+                print(f"  Missing values count: {iMissingCnt}")
                 print(f"  Values:\n{lVals}\n")
+
             # endif
 
         # endfor
