@@ -35,6 +35,7 @@ The automation system for action execution
    workspace/basics
    workspace/level-1
    config_proc
+   products/analyze
    license
 
 `main <../../html/index.html>`__

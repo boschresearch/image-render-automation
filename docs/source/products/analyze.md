@@ -13,7 +13,10 @@ In the following the two configuration files needed are discussed.
 
 The production configuration is typically specified in the file `production.json` that is stored next to your `launch.json` file. (This is also the default file used by the gui image viewer, that can be started with `cathy gui ws`.) However, you can have multiple production files and name them differently. The basic idea here is, that you define a path search pattern, where the resultant 'artefacts' (images, data files, etc.) of running the Catharsys configuration can be found. To explain the details, consider the following folder tree of some render results as seen on the right:
 
-<img style="float: right; width: 20%; padding-left: 20px; padding-right: 20px;" src="assets/artefact-tree-02.png">
+:::{image} assets/artefact-tree-01.png
+:width: 250px
+:class: float-end
+:::
 
 We want to search for the rendered images together with the depth and label images that are located in the opened folders on the right. The pattern we define is split into two parts:
 

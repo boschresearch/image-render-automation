@@ -57,7 +57,13 @@ release = sVersion
 # ones.
 extensions = ["sphinx.ext.intersphinx", "myst_parser"]
 
-myst_enable_extensions = ["colon_fence", "deflist", "fieldlist", "substitution"]
+myst_enable_extensions = [
+    "colon_fence",
+    "deflist",
+    "fieldlist",
+    "substitution",
+    "html_image",
+]
 
 myst_substitutions = {"ProjectName": project}
 
