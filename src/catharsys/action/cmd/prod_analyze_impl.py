@@ -55,6 +55,7 @@ def RunAnalysis(
     _sConfig: str,
     _sProdAnaCfgFile: str,
     _sScanFile: Optional[str] = None,
+    _lProdAnaNames: Optional[list[str]] = None,
 ):
     try:
         xWs = CWorkspace()
@@ -140,8 +141,17 @@ def RunAnalysis(
             raise RuntimeError("Element 'lAnalyzeMissing' not found in production analysis configuration")
         # endif
 
+        lAnaNames: list[str] = None
+        if isinstance(_lProdAnaNames, list) and len(_lProdAnaNames) > 0:
+            lAnaNames = _lProdAnaNames
+        # endif
+
         for dicAna in lAnaMissing:
             sName: str = convert.DictElementToString(dicAna, "sName")
+            if lAnaNames is not None and sName not in lAnaNames:
+                continue
+            # endif
+
             sGroupId: str = convert.DictElementToString(dicAna, "sGroupId")
             sGroupVarId: str = convert.DictElementToString(dicAna, "sGroupVarId")
             lArtTypeIds: list[str] = convert.DictElementToStringList(dicAna, "lArtTypeIds", lDefault=[])
@@ -149,7 +159,9 @@ def RunAnalysis(
                 lArtTypeIds = None
             # endif
 
-            print(f"Running analysis '{sName}':")
+            sTitle = f"\nRunning analysis '{sName}':"
+            print(sTitle)
+            print("=" * len(sTitle))
 
             xGrp = xProds.dicGroups.get(sGroupId)
             if xGrp is None:

@@ -61,6 +61,15 @@ def AddArgParseArguments(_parseArgs):
         help="Specify the file system scan file to use",
     )
 
+    _parseArgs.add_argument(
+        "-n",
+        "--names",
+        nargs="*",
+        dest="ana_names",
+        default=[],
+        help="Analysis names to process. By default, all analysis configurations are processed.",
+    )
+
 
 # enddef
 
@@ -76,6 +85,7 @@ def RunCmd(_argsCmd, _lArgs):
         _sConfig=argsSubCmd.config_folder[0],
         _sProdAnaCfgFile=argsSubCmd.prod_ana_config[0],
         _sScanFile=argsSubCmd.scan_file[0],
+        _lProdAnaNames=argsSubCmd.ana_names,
     )
 
 
