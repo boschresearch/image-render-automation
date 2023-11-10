@@ -24,7 +24,7 @@ import copy
 import enum
 from collections.abc import Iterable
 from pathlib import Path
-from typing import Optional
+from typing import Optional, Callable, Union
 
 from catharsys.api.products.cls_products import CProducts
 from catharsys.api.products.cls_group import CGroup, CArtefactType
@@ -65,8 +65,9 @@ class CViewDimNode:
     @property
     def sDimLabel(self) -> str:
         return self._xViewDim.sDimLabel
+
     # enddef
-    
+
     @property
     def sValue(self) -> str:
         return self._xProdView.GetViewDimValue(self._xViewDim)
@@ -442,8 +443,27 @@ class CProductView:
     # enddef
 
     # ####################################################################################################################
-    def ScanArtefacts(self, *, _sGroupId: Optional[str] = None):
+    def ScanArtefacts(
+        self,
+        *,
+        _sGroupId: Optional[str] = None,
+        _funcStatus: Optional[Callable[[str], None]] = None,
+        _funcIterInit: Optional[Callable[[str, int], None]] = None,
+        _funcIterUpdate: Optional[Callable[[int], None]] = None,
+    ):
         self._xProdData.ScanArtefacts(_sGroupId=_sGroupId)
+
+    # enddef
+
+    # ######################################################################################################
+    def SerializeScan(self, _xFilePath: Union[str, list, tuple, Path]):
+        self._xProdData.SerializeScan(_xFilePath)
+
+    # enddef
+
+    # ######################################################################################################
+    def DeserializeScan(self, _xFilePath: Union[str, list, tuple, Path]):
+        self._xProdData.DeserializeScan(_xFilePath)
 
     # enddef
 

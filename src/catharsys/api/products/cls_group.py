@@ -209,10 +209,11 @@ class CGroup:
     # ######################################################################################################
     def SerializeScan(self) -> list[tuple]:
         lChildren = []
-        for xChild in self._xTree.children:
-            lChildren.append(self._DoSerializeNode(xChild))
-        # endfor
-
+        if self.bHasData is True:
+            for xChild in self._xTree.children:
+                lChildren.append(self._DoSerializeNode(xChild))
+            # endfor
+        # endif
         return lChildren
 
     # enddef
