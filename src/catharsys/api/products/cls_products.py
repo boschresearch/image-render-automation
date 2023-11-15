@@ -25,6 +25,7 @@ import copy
 from pathlib import Path
 from typing import Iterator, Optional, Union, Callable
 
+import ison
 from catharsys.api.cls_project import CProject
 
 from anybase import config
@@ -125,7 +126,12 @@ class CProducts:
     # #####################################################################################################
     def FromFile(self, _pathConfig: Path, *, _bIgnoreGroupExceptions: bool = False):
         dicExceptions: dict[str, str] = dict()
-        self._dicCfg = config.Load(_pathConfig, sDTI="/catharsys/production:1")
+
+        self._dicCfg = config.Load(_pathConfig, sDTI="/catharsys/production:1", bAddPathVars=False)
+
+        xParser = ison.Parser(self._xProject.xConfig.GetFilepathVarDict(_pathConfig), sImportPath=_pathConfig.parent)
+        self._dicCfg = xParser.Process(self._dicCfg)
+
         dicGroups = self._dicCfg["mGroups"]
         for sGroup in dicGroups:
             try:
@@ -158,6 +164,10 @@ class CProducts:
     ):
         if _sGroupId is None:
             for sGroup in self._dicGroups:
+                if sGroup.startswith("__"):
+                    continue
+                # endif
+
                 if _funcStatus is not None:
                     _funcStatus(f"Scanning for production group '{sGroup}'...")
                 # endif
