@@ -27,12 +27,15 @@ from pathlib import Path
 from dataclasses import dataclass
 import anytree
 from typing import Union, Optional, Callable
-from anytree.exporter import DictExporter
+
+# from anytree.exporter import DictExporter
 
 from catharsys.api.cls_project import CProject
 
 from anybase import config
-from anybase import file as anyfile
+
+# from anybase import file as anyfile
+from anybase.cls_any_error import CAnyError_Message
 
 from .cls_node import CNode, ENodeType
 from .cls_path_structure import CPathStructure, CPathVar, EPathVarType
@@ -140,6 +143,10 @@ class CGroup:
         )
 
         for sVarId, xPathVar in self._xPathStruct.dicVars.items():
+            if sVarId.startswith("__"):
+                continue
+            # endif
+
             if xPathVar.eType != EPathVarType.FIXED:
                 self._dicVarValues[sVarId] = ""
             # endif
@@ -152,6 +159,10 @@ class CGroup:
         # endif
 
         for sArtId in dicArtefacts:
+            if sArtId.startswith("__"):
+                continue
+            # endif
+
             dicArt: dict = dicArtefacts[sArtId]
             dicDti: dict = config.CheckConfigType(dicArt, "/catharsys/production/artefact/*:*")
             if dicDti["bOK"] is False:
@@ -173,6 +184,10 @@ class CGroup:
             self._dicArtTypes[sArtId] = xArtType
 
             for sVarId, xPathVar in xArtType.xPathStruct.dicVars.items():
+                if sVarId.startswith("__"):
+                    continue
+                # endif
+
                 if xPathVar.eType != EPathVarType.FIXED:
                     self._dicVarValues[sVarId] = ""
                 # endif
@@ -235,7 +250,7 @@ class CGroup:
         if isinstance(xData, str) and xData.startswith("CArtefactType("):
             xArtType = self._dicArtTypes.get(sName)
             if xArtType is None:
-                raise RuntimeError("Invalid artefact type '{sName}'")
+                raise RuntimeError(f"Invalid artefact type '{sName}'")
             # endif
             xNode = CNode(sName, parent=_xParent, _iLevel=0, _eType=ENodeType.ARTGROUP, _xData=xArtType)
         else:
@@ -403,7 +418,17 @@ class CGroup:
                 lVarLabel = lVarValues
             else:
                 for sVarValue in lVarValues:
-                    sLabel = re.sub(xVar.sReParseValue, xVar.sReReplaceValue, sVarValue)
+                    try:
+                        sLabel = re.sub(xVar.sReParseValue, xVar.sReReplaceValue, sVarValue)
+                    except Exception as xEx:
+                        raise CAnyError_Message(
+                            sMsg=(
+                                f"Error substituting regular expression '{xVar.sReParseValue}' "
+                                f"with '{xVar.sReReplaceValue}' for value '{sVarValue}'"
+                            ),
+                            xChildEx=xEx,
+                        )
+                    # endtry
                     lVarLabel.append(sLabel)
                 # endfor
             # endif
