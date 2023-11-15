@@ -20,7 +20,7 @@
 # </LICENSE>
 ###
 
-import copy
+import re
 from pathlib import Path
 from typing import Callable, Optional, Iterator, Any
 from dataclasses import dataclass
@@ -135,6 +135,8 @@ class CPathStructure:
                         sName=_dicUserVars[sVarId].get("sName", sVarId),
                         eType=EPathVarType.USER,
                         eNodeType=eNodeType,
+                        sReParseValue=_dicUserVars[sVarId].get("sRegExParseValue"),
+                        sReReplaceValue=_dicUserVars[sVarId].get("sRegExReplaceValue"),
                     )
                 else:
                     self._dicVars[sVarId] = CPathVar(
@@ -173,7 +175,7 @@ class CPathStructure:
                         _iLevel=_iLevel,
                         _eType=xPathVar.eNodeType,
                         _xData=xResult.xData,
-                        _sPathName=xResult.sPathName
+                        _sPathName=xResult.sPathName,
                     )
                     if xResult.pathScan is not None and len(lPathVarIds) > _iLevel + 1:
                         self.ScanFileSystem(
@@ -189,12 +191,22 @@ class CPathStructure:
             if _pathScan is None:
                 raise RuntimeError("User path variable must not be the first element of a path structure")
             # endif
+            reValue: Optional[re.Pattern] = None
+            if xPathVar.sReParseValue is not None:
+                reValue = re.compile(xPathVar.sReParseValue)
+            # endif
+
             for pathItem in _pathScan.iterdir():
                 if (xPathVar.eNodeType == ENodeType.PATH and not pathItem.is_dir()) or (
                     xPathVar.eNodeType == ENodeType.ARTEFACT and not pathItem.is_file()
                 ):
                     continue
                 # endif
+
+                if reValue is not None and reValue.fullmatch(pathItem.name) is None:
+                    continue
+                # endif
+
                 nodeX = CNode(pathItem.name, parent=_nodeParent, _iLevel=_iLevel, _eType=xPathVar.eNodeType)
                 if xPathVar.eNodeType == ENodeType.PATH and len(lPathVarIds) > _iLevel + 1:
                     self.ScanFileSystem(
