@@ -25,9 +25,9 @@
 ###
 
 # Class to handle manifest files
-import os
 import copy
-from typing import Optional
+from dataclasses import dataclass
+from typing import Optional, Union
 from anybase.cls_any_error import CAnyError_Message
 from catharsys.util import config
 from catharsys.util.cls_configcml import CConfigCML
@@ -36,6 +36,18 @@ import ison
 from pathlib import Path
 
 from catharsys.decs.decorator_log import logFunctionCall
+
+
+@dataclass
+class CLoopRange:
+    iMin: int
+    iMax: int
+    iStep: int
+    iStepCnt: int = 0
+    iStride: int = 0
+
+
+# endclass
 
 
 class CConfigManifest:
@@ -160,14 +172,58 @@ class CConfigManifest:
     # enddef
 
     ######################################################################################
-    def _GetControlLoopIterCfg(self, *, _iIdx: int, _dicIterCfg: dict, _dicCtrl: dict, _sImportPath: str) -> dict:
+    def _GetControlLoopIterCfg(
+        self,
+        *,
+        _xIdx: Union[int, list[int]],
+        _dicIterCfg: dict,
+        _dicCtrl: dict,
+        _sImportPath: str,
+        _iProcVersion: int,
+    ) -> dict:
         dicCtrlIter = {}
         if _dicIterCfg is not None:
             dicCtrlIter = copy.deepcopy(_dicIterCfg)
         # endif
 
-        # Execute lambda function call on dicCtrlIter with parameter str(iIdx)
-        dicCtrlIter = ison.lambda_parser.Parse(dicCtrlIter, [str(_iIdx)])
+        bIsSingleIdx: bool = True
+
+        if _iProcVersion == 1:
+            if isinstance(_xIdx, list):
+                raise RuntimeError("Multiple iteration indices not supported for process type 1")
+            # endif
+
+            # Execute lambda function call on dicCtrlIter with parameter str(iIdx)
+            dicCtrlIter = ison.lambda_parser.Parse(dicCtrlIter, [str(_xIdx)])
+
+        elif _iProcVersion == 2:
+            # In this new version, starting with Catharsys 3.2.32,
+            # the whole mIterationConfig element is regared as a lambda dictionary,
+            # as it was initially intended. However, this means, that instead of
+            # referencing the iteration index with '$L{%0}', you simply write '%0'.
+            sLambda = ison.lambda_parser.ToLambdaString(dicCtrlIter)
+            sCtrlIterLambda = f"$L{{{sLambda}}}"
+            # print(f"dicCtrlIter: {dicCtrlIter}")
+            # print(f"sCtrlIterLambda: {sCtrlIterLambda}")
+
+            if isinstance(_xIdx, int):
+                # Execute lambda function call on dicCtrlIter with parameter str(iIdx)
+                sCtrlIter = ison.lambda_parser.Parse(sCtrlIterLambda, [str(_xIdx)])
+
+            elif isinstance(_xIdx, list):
+                lStrIdx: list[str] = [str(i) for i in _xIdx]
+                sCtrlIter = ison.lambda_parser.Parse(sCtrlIterLambda, lStrIdx)
+                bIsSingleIdx = False
+
+            else:
+                raise RuntimeError(f"Invalid index type: {_xIdx}")
+            # endif
+
+            dicCtrlIter = ison.lambda_parser.ToLambdaObject(sCtrlIter)
+
+        else:
+            raise RuntimeError(f"Unsupported control loop iteration config process version {_iProcVersion}")
+        # endif
 
         # Add locally defined variables from loop config
         for sVarType in [
@@ -195,7 +251,14 @@ class CConfigManifest:
 
         # Replace 'sId' with the processed 'dIterId' if it exists
         if "sId" not in dicCtrlIter:
-            dicCtrlIter["sId"] = str(_iIdx)
+            sIdx: str = None
+            if bIsSingleIdx is True:
+                sIdx = str(_xIdx)
+            else:
+                sIdx = "/".join(_xIdx)
+            # endif
+
+            dicCtrlIter["sId"] = sIdx
         else:
             # process 'sId' in case it contains functions/variables
             lProcId = self.xCML.Process(
@@ -207,7 +270,7 @@ class CConfigManifest:
         # endif
 
         # add element 'idx' to config
-        dicCtrlIter["idx"] = _iIdx
+        dicCtrlIter["idx"] = _xIdx
 
         # set iteration DTI
         dicCtrlIter["sDTI"] = "/catharsys/manifest/control/loop/iter:1.0"
@@ -217,7 +280,7 @@ class CConfigManifest:
     # endif
 
     ######################################################################################
-    def _ProcessControlLoopRange(self, *, _pathCfgFile: Path, _dicCtrl: dict) -> list:
+    def _ProcessControlLoopRange(self, *, _pathCfgFile: Path, _dicCtrl: dict, _iProcVersion: int) -> list:
         # xCML = CConfigCML(xPrjCfg=self.xPrjCfg, dicConstVars=_dicCfgVars)
 
         sImportPath = _pathCfgFile.as_posix()
@@ -243,7 +306,7 @@ class CConfigManifest:
         if lRange[3] is not None:
             lActiveIndices = convert.DictElementToIntList(lRange[3], "lActiveIndices")
             if len(lActiveIndices) == 0:
-                raise RuntimeError(f"Active index list is empty in loop config file '{_pathCfgFile.name}'")
+                lActiveIndices: list = None
             # endif
         else:
             lActiveIndices: list = None
@@ -258,7 +321,11 @@ class CConfigManifest:
             # endif
 
             dicCtrlIter = self._GetControlLoopIterCfg(
-                _iIdx=iIdx, _dicIterCfg=dicIterCfg, _dicCtrl=_dicCtrl, _sImportPath=sImportPath
+                _xIdx=iIdx,
+                _dicIterCfg=dicIterCfg,
+                _dicCtrl=_dicCtrl,
+                _sImportPath=sImportPath,
+                _iProcVersion=_iProcVersion,
             )
             dicCtrlIter["iMin"] = iMin
             dicCtrlIter["iMax"] = iMax
@@ -273,7 +340,189 @@ class CConfigManifest:
     # enddef
 
     ######################################################################################
-    def _ProcessControlLoopList(self, *, _pathCfgFile: Path, _dicCtrl: dict) -> list:
+    def _IterControlLoopNestedRange(
+        self,
+        *,
+        _lLoops: list[CLoopRange],
+        _iDim: int,
+        _lIdx: list[int],
+        _lCtrlValues: list[dict],
+        _dicIterCfg: dict,
+        _dicCtrl: dict,
+        _sImportPath: str,
+        _iProcVersion: int,
+        _setActivePosList: Optional[set[int]] = None,
+    ):
+        xLoopRange = _lLoops[_iDim]
+        lIdx = _lIdx.copy()
+        lIdx.append(0)
+        bLastLoop: bool = len(lIdx) == len(_lLoops)
+
+        for iIdx in range(xLoopRange.iMin, xLoopRange.iMax + 1, xLoopRange.iStep):
+            lIdx[_iDim] = iIdx
+            if bLastLoop is False:
+                self._IterControlLoopNestedRange(
+                    _lLoops=_lLoops,
+                    _iDim=_iDim + 1,
+                    _lIdx=lIdx,
+                    _lCtrlValues=_lCtrlValues,
+                    _dicIterCfg=_dicIterCfg,
+                    _dicCtrl=_dicCtrl,
+                    _sImportPath=_sImportPath,
+                    _iProcVersion=_iProcVersion,
+                    _setActivePosList=_setActivePosList,
+                )
+            else:
+                if _setActivePosList is not None:
+                    iPos = sum([(iIdx - xLoop.iMin) * xLoop.iStride for iIdx, xLoop in zip(lIdx, _lLoops)])
+                    if iPos not in _setActivePosList:
+                        # print(f"Ignoring index {lIdx} with position {iPos}")
+                        continue
+                    # endif
+                # endif
+
+                dicCtrlIter = self._GetControlLoopIterCfg(
+                    _xIdx=lIdx.copy(),
+                    _dicIterCfg=_dicIterCfg,
+                    _dicCtrl=_dicCtrl,
+                    _sImportPath=_sImportPath,
+                    _iProcVersion=_iProcVersion,
+                )
+                dicCtrlIter["lMin"] = [xLoop.iMin for xLoop in _lLoops]
+                dicCtrlIter["lMax"] = [xLoop.iMax for xLoop in _lLoops]
+                dicCtrlIter["lStep"] = [xLoop.iStep for xLoop in _lLoops]
+
+                # add iter config to value list
+                _lCtrlValues.append(dicCtrlIter)
+
+            # endif
+
+        # endfor
+
+    # enddef
+
+    ######################################################################################
+    def _ProcessControlLoopNestedRange(
+        self,
+        *,
+        _pathCfgFile: Path,
+        _dicCtrl: dict,
+        _iProcVersion: int,
+    ) -> list:
+        sImportPath = _pathCfgFile.as_posix()
+        lProcData = self.xCML.Process(
+            _dicCtrl,
+            sImportPath=sImportPath,
+            lProcessPaths=["lRanges", "lActiveIndices"],
+        )
+
+        if lProcData[0] is None:
+            raise Exception(f"No ranges given for nested loop in config file '{_pathCfgFile.name}'")
+        # endif
+
+        # ####################################################################################################
+        # Expect ranges to be specified as list of dictionaries with elements iMin, iMax, iStep (optional).
+        #   lRanges: [{iMin: 1, iMax: 2}, {iMin: 5, iMax: 10, iStep: 2}]
+        #
+        # print(f"lProcData: {lProcData}")
+        lProcRanges: dict = lProcData[0]["lRanges"]
+        if not isinstance(lProcRanges, list):
+            raise RuntimeError(f"Loop ranges element 'lRanges' must be list of dictionaries, but found: {lProcRanges}")
+        # endif
+
+        lLoops: list[CLoopRange] = []
+        dicRange: dict
+        for iIdx, dicRange in enumerate(lProcRanges):
+            iMin = convert.DictElementToInt(dicRange, "iMin", iDefault=None, bDoRaise=False)
+            if iMin is None:
+                raise Exception(
+                    f"Loop definition at nesting level '{iIdx}' has no element 'iMin' defined. See file: {_pathCfgFile.name}"
+                )
+            # endif
+
+            iMax = convert.DictElementToInt(dicRange, "iMax", iDefault=None, bDoRaise=False)
+            if iMax is None:
+                raise Exception(
+                    f"Loop definition at nesting level '{iIdx}' has no element 'iMax' defined. See file: {_pathCfgFile.name}"
+                )
+            # endif
+
+            iStep = convert.DictElementToInt(dicRange, "iStep", iDefault=1)
+
+            iStepCnt = (iMax - iMin) // iStep + 1
+            lLoops.append(CLoopRange(iMin, iMax, iStep, iStepCnt))
+        # endfor
+
+        lStrides: list[int] = [1]
+        iStride = 1
+        for xLoop in reversed(lLoops[1:]):
+            iStride *= xLoop.iMax - xLoop.iMin + 1
+            lStrides.insert(0, iStride)
+        # endfor
+
+        for xLoop, iStride in zip(lLoops, lStrides):
+            xLoop.iStride = iStride
+        # endfor
+
+        # Expects lActiveIndices to be a list of lists of indices.
+        # Example of lActiveIndices for 2d nested list:
+        #   [ [2,3], [1,5] ]
+        # Example of lActiveIndices for 3d nested list:
+        #   [ [2,3,1], [1,5,3] ]
+
+        setActivePosList: set[int] = None
+        if lProcData[1] is not None:
+            lActiveIndices = lProcData[1]["lActiveIndices"]
+            if not isinstance(lActiveIndices, list):
+                raise RuntimeError(
+                    f"Element 'lActiveIndices' must be a list of lists of integers, not: {lActiveIndices}"
+                )
+            # endif
+
+            if not all((isinstance(x, list) for x in lActiveIndices)):
+                raise RuntimeError(
+                    f"Element 'lActiveIndices' must be a list of lists of integers, not: {lActiveIndices}"
+                )
+            # endif
+
+            if len(lActiveIndices) > 0:
+                setActivePosList = set(
+                    [
+                        sum([(iIdx - xLoop.iMin) * xLoop.iStride for iIdx, xLoop in zip(lActIdx, lLoops)])
+                        for lActIdx in lActiveIndices
+                    ]
+                )
+                # print(f"setActivePosList: {setActivePosList}")
+            # endif
+        # endif
+
+        dicIterCfg = _dicCtrl.get("mIterationConfig")
+        lCtrlValues: list = []
+
+        self._IterControlLoopNestedRange(
+            _lLoops=lLoops,
+            _iDim=0,
+            _lIdx=[],
+            _lCtrlValues=lCtrlValues,
+            _dicIterCfg=dicIterCfg,
+            _dicCtrl=_dicCtrl,
+            _sImportPath=sImportPath,
+            _setActivePosList=setActivePosList,
+            _iProcVersion=_iProcVersion,
+        )
+
+        return lCtrlValues
+
+    # enddef
+
+    ######################################################################################
+    def _ProcessControlLoopList(
+        self,
+        *,
+        _pathCfgFile: Path,
+        _dicCtrl: dict,
+        _iProcVersion: int,
+    ) -> list:
         # xCML = CConfigCML(xPrjCfg=self.xPrjCfg, dicConstVars=_dicCfgVars)
 
         sImportPath = _pathCfgFile.as_posix()
@@ -335,7 +584,11 @@ class CConfigManifest:
             iIdx: int = lIndices[iListIdx]
 
             dicCtrlIter = self._GetControlLoopIterCfg(
-                _iIdx=iIdx, _dicIterCfg=dicIterCfg, _dicCtrl=_dicCtrl, _sImportPath=sImportPath
+                _xIdx=iIdx,
+                _dicIterCfg=dicIterCfg,
+                _dicCtrl=_dicCtrl,
+                _sImportPath=sImportPath,
+                _iProcVersion=_iProcVersion,
             )
 
             # add iter config to value list
@@ -430,13 +683,42 @@ class CConfigManifest:
                         lCtrlType = dicCtrlDti["lType"][3:]
                         lCtrlVer = dicCtrlDti["lVersion"]
 
-                        if lCtrlType[0] == "loop" and lCtrlType[1] == "range" and lCtrlVer[0] == 1:
+                        if lCtrlType[0] == "loop" and lCtrlType[1] == "range" and lCtrlVer[0] in [1, 2]:
+                            iProcVersion = 1
+                            if lCtrlVer[0] > 1:
+                                iProcVersion = 2
+                            # endif
+
                             lCtrlValues.extend(
-                                self._ProcessControlLoopRange(_pathCfgFile=pathCfgFile, _dicCtrl=dicCtrl)
+                                self._ProcessControlLoopRange(
+                                    _pathCfgFile=pathCfgFile,
+                                    _dicCtrl=dicCtrl,
+                                    _iProcVersion=iProcVersion,
+                                )
                             )
 
-                        elif lCtrlType[0] == "loop" and lCtrlType[1] == "list" and lCtrlVer[0] == 1:
-                            lCtrlValues.extend(self._ProcessControlLoopList(_pathCfgFile=pathCfgFile, _dicCtrl=dicCtrl))
+                        elif lCtrlType[0] == "loop" and lCtrlType[1] == "list" and lCtrlVer[0] in [1, 2]:
+                            iProcVersion = 1
+                            if lCtrlVer[0] > 1:
+                                iProcVersion = 2
+                            # endif
+
+                            lCtrlValues.extend(
+                                self._ProcessControlLoopList(
+                                    _pathCfgFile=pathCfgFile,
+                                    _dicCtrl=dicCtrl,
+                                    _iProcVersion=iProcVersion,
+                                )
+                            )
+
+                        elif lCtrlType[0] == "loop" and lCtrlType[1] == "nested-range" and lCtrlVer[0] == 1:
+                            lCtrlValues.extend(
+                                self._ProcessControlLoopNestedRange(
+                                    _pathCfgFile=pathCfgFile,
+                                    _dicCtrl=dicCtrl,
+                                    _iProcVersion=2,
+                                ),
+                            )
 
                         else:
                             raise Exception(
