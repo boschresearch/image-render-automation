@@ -33,6 +33,7 @@ from catharsys.util import config
 from catharsys.util.cls_configcml import CConfigCML
 from anybase import convert, path
 import ison
+from ison.core.defines import reLambdaPar
 from pathlib import Path
 
 from catharsys.decs.decorator_log import logFunctionCall
@@ -197,6 +198,14 @@ class CConfigManifest:
             dicCtrlIter = ison.lambda_parser.Parse(dicCtrlIter, [str(_xIdx)])
 
         elif _iProcVersion == 2:
+            if "__func_locals__" in dicCtrlIter or "__func_globals__" in dicCtrlIter:
+                raise RuntimeError(
+                    "You must define '__func_locals__' and '__func_globals__' outside the 'mIterationConfig' element.\n"
+                    "You can define these blocks at the top level of the loop configuration, as all variable blocks "
+                    "are copied into each iteration configuration block."
+                )
+            # endif
+
             # In this new version, starting with Catharsys 3.2.32,
             # the whole mIterationConfig element is regared as a lambda dictionary,
             # as it was initially intended. However, this means, that instead of
@@ -217,6 +226,19 @@ class CConfigManifest:
 
             else:
                 raise RuntimeError(f"Invalid index type: {_xIdx}")
+            # endif
+
+            if sCtrlIter.startswith("$L{"):
+                lVars = [f"%{x[1]}" for x in reLambdaPar.findall(sCtrlIter)]
+                raise RuntimeError(
+                    "Not all lambda parameters could be replaced in the iteration configuration block.\n"
+                    "You must define lambda functions outside the 'mIterationConfig' block.\n"
+                    "Define lambda functions in a '__func_locals__' or '__func_globals__' block "
+                    "at the top level of the loop configuration, \nas all variable blocks "
+                    "are copied into each iteration configuration block.\n"
+                    f"The remaining variables are: {lVars}\n"
+                    f"This is the remaining lambda string:\n{sCtrlIter}"
+                )
             # endif
 
             dicCtrlIter = ison.lambda_parser.ToLambdaObject(sCtrlIter)
@@ -283,7 +305,7 @@ class CConfigManifest:
     def _ProcessControlLoopRange(self, *, _pathCfgFile: Path, _dicCtrl: dict, _iProcVersion: int) -> list:
         # xCML = CConfigCML(xPrjCfg=self.xPrjCfg, dicConstVars=_dicCfgVars)
 
-        sImportPath = _pathCfgFile.as_posix()
+        sImportPath = _pathCfgFile.parent.as_posix()
         lRange = self.xCML.Process(
             _dicCtrl,
             sImportPath=sImportPath,
@@ -409,7 +431,7 @@ class CConfigManifest:
         _dicCtrl: dict,
         _iProcVersion: int,
     ) -> list:
-        sImportPath = _pathCfgFile.as_posix()
+        sImportPath = _pathCfgFile.parent.as_posix()
         lProcData = self.xCML.Process(
             _dicCtrl,
             sImportPath=sImportPath,
@@ -525,7 +547,7 @@ class CConfigManifest:
     ) -> list:
         # xCML = CConfigCML(xPrjCfg=self.xPrjCfg, dicConstVars=_dicCfgVars)
 
-        sImportPath = _pathCfgFile.as_posix()
+        sImportPath = _pathCfgFile.parent.as_posix()
         lRange = self.xCML.Process(
             _dicCtrl,
             sImportPath=sImportPath,
