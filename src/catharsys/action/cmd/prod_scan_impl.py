@@ -73,6 +73,7 @@ def _ScanIterUpdate(iIncrement: int, bEnd: bool = False):
         xIterBar.update(int(iIncrement))
     # endif
 
+
 # enddef
 
 
@@ -109,10 +110,11 @@ def RunScan(
         )
 
         if _sOutFile is None:
+            sFileId: str = xPrj.sId.replace("/", "_")
             if _sGroup is None:
-                pathScan = xPrj.xConfig.pathOutput / f"file-scan-{xPrj.sId}.pickle"
+                pathScan = xPrj.xConfig.pathOutput / f"file-scan-{sFileId}.pickle"
             else:
-                pathScan = xPrj.xConfig.pathOutput / f"file-scan-{xPrj.sId}-{_sGroup}.pickle"
+                pathScan = xPrj.xConfig.pathOutput / f"file-scan-{sFileId}-{_sGroup}.pickle"
             # endif
         else:
             pathScan = anypath.MakeNormPath(_sOutFile).absolute()

@@ -194,11 +194,25 @@ class CWorkspace:
 
     #############################################################################
     def Project(self, _sPrjId: str) -> CProject:
-        if _sPrjId not in self._dicProjects:
-            raise RuntimeError(f"Project '{_sPrjId}' not available in workspace")
+        sPrjId = _sPrjId.replace("\\", "/")
+        if sPrjId not in self._dicProjects:
+            pathCfg = Path(sPrjId).absolute()
+            sSelCfg: str = None
+            if pathCfg.is_relative_to(self.pathConfig):
+                sPathCfg = pathCfg.as_posix()
+                sSelCfg = next((x for x in self.lProjectNames if sPathCfg.endswith(x)), None)
+            # endif
+
+            if sSelCfg is None:
+                raise RuntimeError(f"Project '{sPrjId}' not available in workspace")
+            # endif
+
+            xProject = self._dicProjects[sSelCfg]
+        else:
+            xProject = self._dicProjects[sPrjId]
         # endif
 
-        return self._dicProjects[_sPrjId]
+        return xProject
 
     # enddef
 

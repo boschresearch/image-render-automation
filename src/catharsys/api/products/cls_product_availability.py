@@ -21,7 +21,7 @@
 ###
 
 from pathlib import Path
-from typing import Optional
+from typing import Optional, Union
 
 from anybase import file as anyfile
 
@@ -38,6 +38,15 @@ class CMissing:
     xNode: CNode
     iLevel: int
     lNames: list[str]
+
+
+# endclass
+
+
+@dataclass
+class CMissingData:
+    tPath: tuple[str]
+    lValues: Union[list[str], list[int]]
 
 
 # endclass
@@ -140,13 +149,15 @@ class CProductAvailability:
 
     # enddef
 
-    def GetMissingArtefactsGroupVarValues(self, _sVarId: str, _lArtTypeIds: Optional[list[str]] = None):
+    def GetMissingArtefactsGroupVarValues(
+        self, _sVarId: str, _lArtTypeIds: Optional[list[str]] = None
+    ) -> list[CMissingData]:
         if _sVarId not in self._xGrp.xPathStruct.lPathVarIds:
             raise RuntimeError(f"Group variable '{_sVarId}' does not exist")
         # endif
         iVarLevel = self._xGrp.xPathStruct.lPathVarIds.index(_sVarId)
         # lVarValues = self._lSelGrpVarValLists[iVarLevel]
-        dicVarValMissing: dict[str, set[str]] = dict()
+        dicVarValMissing: dict[tuple[str], set[str]] = dict()
 
         if _lArtTypeIds is None:
             lArtTypeIds = list(self._dicSelArtVarValLists.keys())
@@ -156,11 +167,12 @@ class CProductAvailability:
 
         for xMissing in self.lGroupMissing:
             if xMissing.xNode.iLevel == iVarLevel - 1:
-                sPath = xMissing.xNode.pathFS.as_posix()
-                if sPath not in dicVarValMissing:
-                    dicVarValMissing[sPath] = set()
+                # sPath = xMissing.xNode.pathFS.as_posix()
+                tPath = tuple(xMissing.xNode.lPathNames)
+                if tPath not in dicVarValMissing:
+                    dicVarValMissing[tPath] = set()
                 # endif
-                dicVarValMissing[sPath].update(xMissing.lNames)
+                dicVarValMissing[tPath].update(xMissing.lNames)
 
             elif xMissing.xNode.iLevel > iVarLevel:
                 xVarNode: CNode = xMissing.xNode.ancestors[iVarLevel + 1]
@@ -168,18 +180,21 @@ class CProductAvailability:
                 xPathNode: CNode = xVarNode.parent
                 # print(f"xPathNode: {xPathNode}")
 
-                sPath = xPathNode.pathFS.as_posix()
-                if sPath not in dicVarValMissing:
-                    dicVarValMissing[sPath] = set()
+                # sPath = xPathNode.pathFS.as_posix()
+                tPath = tuple(xMissing.xNode.lPathNames)
+                if tPath not in dicVarValMissing:
+                    dicVarValMissing[tPath] = set()
                 # endif
-                dicVarValMissing[sPath].add(xVarNode.name)
+                dicVarValMissing[tPath].add(xVarNode.name)
 
             else:
-                pathMain = xMissing.xNode.pathFS
+                # pathMain = xMissing.xNode.pathFS
+                tPath = tuple(xMissing.xNode.lPathNames)
                 for sName in xMissing.lNames:
-                    sPath = (pathMain / sName).as_posix()
-                    if sPath not in dicVarValMissing:
-                        dicVarValMissing[sPath] = set()
+                    # sPath = (pathMain / sName).as_posix()
+                    tPath += (sName,)
+                    if tPath not in dicVarValMissing:
+                        dicVarValMissing[tPath] = set()
                     # endif
                 # endfor
             # endif
@@ -196,26 +211,27 @@ class CProductAvailability:
                 xPathNode: CNode = xVarNode.parent
                 # print(f"xPathNode: {xPathNode}")
 
-                sPath = xPathNode.pathFS.as_posix()
-                if sPath not in dicVarValMissing:
-                    dicVarValMissing[sPath] = set()
+                # sPath = xPathNode.pathFS.as_posix()
+                tPath = tuple(xPathNode.lPathNames)
+                if tPath not in dicVarValMissing:
+                    dicVarValMissing[tPath] = set()
                 # endif
-                dicVarValMissing[sPath].add(xVarNode.name)
+                dicVarValMissing[tPath].add(xVarNode.name)
             # endfor
         # endfor
 
-        dicMissing: dict[str, list] = {}
-        for sPath, setVals in dicVarValMissing.items():
+        lMissing: list[CMissingData] = []
+        for tPath, setVals in dicVarValMissing.items():
             if len(setVals) > 0 and next((self._IsInt(x) for x in setVals), None) is True:
                 lVals = [int(x) for x in setVals]
             else:
                 lVals = list(setVals)
             # endif
             lVals.sort()
-            dicMissing[sPath] = lVals
+            lMissing.append(CMissingData(tPath, lVals))
         # endfor
 
-        return dicMissing
+        return lMissing
 
     # enddef
 
@@ -235,17 +251,18 @@ class CProductAvailability:
         _sVarId: str,
         _lArtTypeIds: Optional[list[str]] = None,
         _bConcise: bool = False,
-        _dicMissing: Optional[dict] = None,
+        _lMissing: Optional[list[CMissingData]] = None,
     ):
-        if _dicMissing is None:
-            dicMissing = self.GetMissingArtefactsGroupVarValues(_sVarId, _lArtTypeIds)
+        lMissing: list[CMissingData]
+        if _lMissing is None:
+            lMissing = self.GetMissingArtefactsGroupVarValues(_sVarId, _lArtTypeIds)
         else:
-            dicMissing = _dicMissing
+            lMissing = _lMissing
         # endif
 
         sVarName = self._xGrp.xPathStruct.dicVars[_sVarId].sName
 
-        if len(dicMissing) == 0:
+        if len(lMissing) == 0:
             print("All artefacts available")
             return
         # endif
@@ -253,22 +270,23 @@ class CProductAvailability:
         if isinstance(_lArtTypeIds, list) and len(_lArtTypeIds) > 0:
             sArtNames = ", ".join(_lArtTypeIds)
             print(
-                f"Artefact type(s) '{sArtNames}' missing for the following values of path variable '{sVarName}' [{_sVarId}]:"
+                f"Artefact type(s) '{sArtNames}' missing for the following values "
+                f"of path variable '{sVarName}' [{_sVarId}]:"
             )
         else:
             print(f"Any artefact types missing for the following values '{sVarName}' [{_sVarId}]:")
         # endif
         print("")
 
-        for sPath, lVals in dicMissing.items():
-            print(f"  Path: {sPath}")
+        for xMissing in lMissing:
+            print(f"  Path: {xMissing.tPath}")
             iMissingCnt: int = 0
 
-            if _bConcise is True and isinstance(lVals[0], int):
+            if _bConcise is True and isinstance(xMissing.lValues[0], int):
                 lCluster: list[str] = []
-                iStartVal = lVals[0]
+                iStartVal = xMissing.lValues[0]
                 iPrevVal = iStartVal
-                for iVal in lVals[1:]:
+                for iVal in xMissing.lValues[1:]:
                     if iVal > iPrevVal + 1:
                         if iStartVal == iPrevVal:
                             lCluster.append(iStartVal)
@@ -298,9 +316,9 @@ class CProductAvailability:
                 print(f"  Missing values count: {iMissingCnt}")
                 print(f"  Values:\n{lCluster}\n")
             else:
-                iMissingCnt = len(lVals)
+                iMissingCnt = len(xMissing.lValues)
                 print(f"  Missing values count: {iMissingCnt}")
-                print(f"  Values:\n{lVals}\n")
+                print(f"  Values:\n{xMissing.lValues}\n")
 
             # endif
 
@@ -315,20 +333,22 @@ class CProductAvailability:
         _sVarId: str,
         _lArtTypeIds: Optional[list[str]] = None,
         _iIndent: int = -1,
-        _dicMissing: Optional[dict] = None,
+        _lMissing: Optional[list[CMissingData]] = None,
     ):
-        if _dicMissing is None:
-            dicMissing = self.GetMissingArtefactsGroupVarValues(_sVarId, _lArtTypeIds)
+        lMissing: list[CMissingData]
+        if _lMissing is None:
+            lMissing = self.GetMissingArtefactsGroupVarValues(_sVarId, _lArtTypeIds)
         else:
-            dicMissing = _dicMissing
+            lMissing = _lMissing
         # endif
 
         dicData = {
             "sDTI": "/catharsys/production/missing/single-var:1.0",
             "sProjectId": self._xGrp.xProject.sId,
+            "lPathVarIds": self._xGrp.xPathStruct.lPathVarIds,
             "sProdVarId": _sVarId,
             "lArtefactTypeIds": _lArtTypeIds,
-            "mMissing": dicMissing,
+            "lMissing": lMissing,
         }
 
         anyfile.SaveJson(_pathFile, dicData, iIndent=_iIndent)

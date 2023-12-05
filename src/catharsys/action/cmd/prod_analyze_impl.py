@@ -114,7 +114,8 @@ def RunAnalysis(
         # #####################################################################
         # Load scan file
         if _sScanFile is None:
-            pathScan = xPrj.xConfig.pathOutput / f"file-scan-{xPrj.sId}.pickle"
+            sFileId = xPrj.sId.replace("/", "_")
+            pathScan = xPrj.xConfig.pathOutput / f"file-scan-{sFileId}.pickle"
         else:
             pathScan = anypath.MakeNormPath(_sScanFile)
             if not pathScan.is_absolute():
@@ -212,7 +213,7 @@ def RunAnalysis(
                 _xGroup=xGrp, _lSelGrpVarValLists=lGrpVarValLists, _dicSelArtVarValLists=dicArtVarValLists
             )
             xProdAvail.Analyze()
-            dicVarValMissing = xProdAvail.GetMissingArtefactsGroupVarValues(sGroupVarId, lArtTypeIds)
+            lVarValMissing = xProdAvail.GetMissingArtefactsGroupVarValues(sGroupVarId, lArtTypeIds)
 
             dicPrint: dict = dicAna.get("mPrint")
             bPrintConcise: bool = False
@@ -223,15 +224,17 @@ def RunAnalysis(
                     _sVarId=sGroupVarId,
                     _lArtTypeIds=lArtTypeIds,
                     _bConcise=bPrintConcise,
-                    _dicMissing=dicVarValMissing,
+                    _lMissing=lVarValMissing,
                 )
             # endif
 
             dicSave: dict = dicAna.get("mSave")
             if isinstance(dicSave, dict):
                 sArtTypeName = "-".join(lArtTypeIds)
+                sFileId = xPrj.sId.replace("/", "_")
+
                 pathMissing: Path = (
-                    xPrj.xConfig.pathOutput / f"file-scan-missing-{xPrj.sId}-{sGroupVarId}-{sArtTypeName}.json"
+                    xPrj.xConfig.pathOutput / f"file-scan-missing-{sFileId}-{sGroupVarId}-{sArtTypeName}.json"
                 )
                 sSavePath: str = convert.DictElementToString(dicSave, "sPath", sDefault=None, bDoRaise=False)
                 if sSavePath is not None:
@@ -243,7 +246,7 @@ def RunAnalysis(
                     _pathFile=pathMissing,
                     _sVarId=sGroupVarId,
                     _lArtTypeIds=lArtTypeIds,
-                    _dicMissing=dicVarValMissing,
+                    _lMissing=lVarValMissing,
                     _iIndent=iIndent,
                 )
 

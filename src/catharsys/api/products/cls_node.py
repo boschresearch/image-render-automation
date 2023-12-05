@@ -144,11 +144,18 @@ class CNode(anytree.NodeMixin):
     # enddef
 
     @property
-    def pathFS(self) -> Path:
-        sName: str = ""
+    def lPathNames(self) -> list[str]:
         lNames: list[str] = [
             str(node._sPathName) for node in self.path if node._eType in [ENodeType.PATH, ENodeType.ARTEFACT]
         ]
+        return lNames
+
+    # enddef
+
+    @property
+    def pathFS(self) -> Path:
+        sName: str = ""
+        lNames = self.lPathNames
         if len(lNames) > 0:
             sName = "/".join(lNames)
         # endif
