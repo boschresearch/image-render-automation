@@ -131,13 +131,65 @@ class CGroup:
     # enddef
 
     # ######################################################################################################
+    def _IsUserVarsDictValid(self, _dicVars: Optional[dict]) -> tuple[bool, str]:
+        if _dicVars is None:
+            return True, ""
+        # endif
+
+        if not isinstance(_dicVars, dict):
+            return False, f"User variable element 'mVars' is not a dictionary: {_dicVars}"
+        # endif
+
+        lAllowedElements: dict[str, type] = {
+            "sName": str,
+            "sRegExParseValue": str,
+            "sRegExReplaceValue": str,
+        }
+
+        for sVarId, dicVar in _dicVars.items():
+            if not isinstance(dicVar, dict):
+                return False, f"Definition element of user variable '{sVarId}' must be a dictionary, but is: {dicVar}"
+            # endif
+
+            for sValId, xValue in dicVar.items():
+                if sValId not in lAllowedElements:
+                    return False, f"Variable '{sVarId}': element '{sValId}' not allowed in variable definition"
+                # endif
+
+                if not isinstance(xValue, lAllowedElements[sValId]):
+                    return (
+                        False,
+                        f"Variable '{sVarId}': element '{sValId}' must be of type '{lAllowedElements[sValId]}'",
+                    )
+                # endif
+            # endfor
+        # endfor
+        return True, ""
+
+    # enddef
+
+    # ######################################################################################################
+    def _AssertUserVarsDictValid(self, _dicVars: dict, _sMessage: str):
+        bIsValid, sMsg = self._IsUserVarsDictValid(_dicVars)
+        if bIsValid is False:
+            raise RuntimeError(f"{_sMessage}\n{sMsg}")
+        # endif
+
+    # enddef
+
+    # ######################################################################################################
     def FromConfig(self, _dicCfg: dict):
         self._dicVarValues = dict()
+
+        dicUserVars: dict = _dicCfg.get("mVars")
+        self._AssertUserVarsDictValid(
+            dicUserVars, f"Error parsing user variable definition of production group '{self._sId}'"
+        )
 
         self._sName = _dicCfg.get("sName", self._sId)
         self._xPathStruct = CPathStructure(
             _dicCfg["sPathStructure"],
-            _dicUserVars=_dicCfg.get("mVars"),
+            _dicUserVars=dicUserVars,
             _eLastElementNodeType=ENodeType.PATH,
             _dicSystemVars=self._dicPathSystemVars,
         )
@@ -154,8 +206,15 @@ class CGroup:
 
         self._dicArtTypes = dict()
         dicArtefacts = _dicCfg.get("mArtefacts")
-        if not isinstance(dicArtefacts, dict):
+        if dicArtefacts is None:
             raise RuntimeError(f"Production group '{self._sId}' configuration has no 'mArtefacts' element")
+        # endif
+
+        if not isinstance(dicArtefacts, dict):
+            raise RuntimeError(
+                f"'mArtefacts' element of production group '{self._sId}' "
+                f"configuration is not a dictionary:\n{dicArtefacts}"
+            )
         # endif
 
         for sArtId in dicArtefacts:
@@ -164,10 +223,23 @@ class CGroup:
             # endif
 
             dicArt: dict = dicArtefacts[sArtId]
+            if not isinstance(dicArt, dict):
+                raise RuntimeError(
+                    f"Element '{sArtId}' of 'mArtefacts' dictionary of "
+                    f"production group '{self._sId}', is not a dictionary"
+                )
+            # endif
+
             dicDti: dict = config.CheckConfigType(dicArt, "/catharsys/production/artefact/*:*")
             if dicDti["bOK"] is False:
                 raise RuntimeError(f"Invalid artefact type for artefact '{sArtId}'")
             # endif
+
+            dicUserVars: dict = dicArt.get("mVars")
+            self._AssertUserVarsDictValid(
+                dicUserVars,
+                f"Error parsing user variable definition of artefact '{sArtId}' of production group '{self._sId}'",
+            )
 
             lArtSubType: list[str] = dicDti["lCfgType"][3:]
 
@@ -176,7 +248,7 @@ class CGroup:
             xArtType.lType = lArtSubType.copy()
             xArtType.xPathStruct = CPathStructure(
                 dicArt["sPathStructure"],
-                _dicUserVars=dicArt.get("mVars"),
+                _dicUserVars=dicUserVars,
                 _eLastElementNodeType=ENodeType.ARTEFACT,
                 _dicSystemVars=self._dicPathSystemVars,
             )

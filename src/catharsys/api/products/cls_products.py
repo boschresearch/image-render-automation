@@ -21,7 +21,9 @@
 ###
 
 import re
+import os
 import copy
+from datetime import datetime
 from pathlib import Path
 from typing import Iterator, Optional, Union, Callable
 
@@ -46,8 +48,10 @@ class CProducts:
         _prjX: CProject,
     ):
         self._xProject: CProject = _prjX
-
         self._dicGroups: dict[str, CGroup] = dict()
+        self._dtProdFile: datetime = None
+        self._dtScanProdFile: datetime = None
+        self._lMessages: list[str] = []
 
         self._dicSystemVars: dict[str, CPathVar] = {
             "production": CPathVar(
@@ -123,11 +127,58 @@ class CProducts:
 
     # enddef
 
+    @property
+    def dtProdFileChangeDateTime(self) -> datetime:
+        return self._dtProdFile
+
+    # eddef
+
+    @property
+    def sProdFileChangeDateTimeString(self) -> str:
+        if self._dtProdFile is None:
+            return "n/a"
+        # endif
+
+        return self._dtProdFile.strftime("%d.%m.%Y, %H:%M:%S")
+
+    # enddef
+
+    @property
+    def lMessages(self) -> list[str]:
+        return self._lMessages
+
+    # enddef
+
+    def GetMessages(self, _bDoClear: bool = True) -> list[str]:
+        lMsg = self._lMessages.copy()
+        if _bDoClear is True:
+            self._lMessages.clear()
+        # endif
+        return lMsg
+
+    # enddef
+
+    # #####################################################################################################
+    def DoesScanMatchProdFile(self) -> bool:
+        # print(f"self._dtProdFile: {self._dtProdFile}")
+        # print(f"self._dtScanProdFile: {self._dtScanProdFile}")
+
+        if self._dtProdFile is None or self._dtScanProdFile is None:
+            return False
+        # endif
+
+        return self._dtProdFile == self._dtScanProdFile
+
+    # enddef
+
     # #####################################################################################################
     def FromFile(self, _pathConfig: Path, *, _bIgnoreGroupExceptions: bool = False):
         dicExceptions: dict[str, str] = dict()
 
         self._dicCfg = config.Load(_pathConfig, sDTI="/catharsys/production:1", bAddPathVars=False)
+
+        fTime: float = os.path.getmtime(_pathConfig.as_posix())
+        self._dtProdFile = datetime.utcfromtimestamp(fTime)
 
         xParser = ison.Parser(self._xProject.xConfig.GetFilepathVarDict(_pathConfig), sImportPath=_pathConfig.parent)
         self._dicCfg = xParser.Process(self._dicCfg)
@@ -194,6 +245,12 @@ class CProducts:
             )
         # endif
 
+        # print(f"self._dtProdFile: {self._dtProdFile}")
+        if self._dtProdFile is not None:
+            self._dtScanProdFile = self._dtProdFile
+            # print(f"self._dtScanProdFile: {self._dtScanProdFile}")
+        # endif
+
     # enddef
 
     # ######################################################################################################
@@ -206,6 +263,7 @@ class CProducts:
         dicData = {
             "sDTI": "/catharsys/production/scan:1.0",
             "sProjectId": self._xProject.sId,
+            "fProdFileTimestamp": self._dtProdFile.timestamp(),
             "mGroups": dicGroups,
         }
 
@@ -214,7 +272,9 @@ class CProducts:
     # enddef
 
     # ######################################################################################################
-    def DeserializeScan(self, _xFilePath: Union[str, list, tuple, Path]):
+    def DeserializeScan(self, _xFilePath: Union[str, list, tuple, Path], *, _bDoPrint=True):
+        self._lMessages.clear()
+
         dicData = anyfile.LoadPickle(_xFilePath)
         if not config.IsConfigType(dicData, "/catharsys/production/scan:1"):
             raise RuntimeError("Invalid file type")
@@ -231,6 +291,13 @@ class CProducts:
             )
         # endif
 
+        fProdFileTimestamp = dicData.get("fProdFileTimestamp")
+        # print(f"fProdFileTimestamp: {fProdFileTimestamp}")
+        if isinstance(fProdFileTimestamp, float):
+            self._dtScanProdFile = datetime.fromtimestamp(fProdFileTimestamp)
+            # print(f"self._dtScanProdFile: {self._dtScanProdFile}")
+        # endif
+
         dicGroups = dicData.get("mGroups")
         if dicGroups is None:
             raise RuntimeError("No group data given in product scan file")
@@ -238,7 +305,12 @@ class CProducts:
 
         for sGroup in dicGroups:
             if sGroup not in self._dicGroups:
-                print(f"WARNING: Group '{sGroup}' given in scan not found in current configuration")
+                sMsg = f"WARNING: Group '{sGroup}' given in scan not found in current configuration"
+                self._lMessages.append(sMsg)
+                if _bDoPrint is True:
+                    print(sMsg)
+                # endif
+                continue
             # endif
 
             self._dicGroups[sGroup].DeserializeScan(dicGroups[sGroup])

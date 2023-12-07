@@ -365,6 +365,17 @@ class CProductView:
 
     # enddef
 
+    @property
+    def lMessages(self) -> list[str]:
+        return self._xProdData.lMessages
+
+    # enddef
+
+    # ####################################################################################################################
+    def GetMessages(self, _bDoClear: bool = True) -> list[str]:
+        return self._xProdData.GetMessages(_bDoClear)
+    # enddef
+
     # ####################################################################################################################
     def GetSelectedGroupVarValueCount(self, _sGrpVarId: str) -> int:
         iGrpVarIdx: int = self.lGrpPathVarIds.index(_sGrpVarId)
@@ -437,6 +448,12 @@ class CProductView:
     # enddef
 
     # ####################################################################################################################
+    def DoesScanMatchProdFile(self) -> bool:
+        return self._xProdData.DoesScanMatchProdFile()
+
+    # enddef
+
+    # ####################################################################################################################
     def FromFile(self, _pathProduction: Path):
         self._xProdData.FromFile(_pathProduction)
 
@@ -462,8 +479,8 @@ class CProductView:
     # enddef
 
     # ######################################################################################################
-    def DeserializeScan(self, _xFilePath: Union[str, list, tuple, Path]):
-        self._xProdData.DeserializeScan(_xFilePath)
+    def DeserializeScan(self, _xFilePath: Union[str, list, tuple, Path], *, _bDoPrint=True):
+        self._xProdData.DeserializeScan(_xFilePath, _bDoPrint=_bDoPrint)
 
     # enddef
 
