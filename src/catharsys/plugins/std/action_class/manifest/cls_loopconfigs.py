@@ -110,6 +110,7 @@ class CLoopConfigs:
         sId = _dicLevel.get("sId")
         self._SetCfgVarsCurrentId(_xCfgVars, sId)
 
+        # 'sFilter' is evaluated as python command
         sFilter = _dicLevel.get("sFilter")
 
         sCfgFilter = None
@@ -168,7 +169,69 @@ class CLoopConfigs:
             )
         # endtry
 
-        return not (bTest and bCfgTest)
+        # #################################################################################
+        # 'bEnable' is evaluated as ISON function. Result must be bool, int or float.
+        # 'sFilter' takes precedence to keep it backward compatible
+        # only test for 'bEnable' element, if there is no 'sFilter' element
+        bEnable = True
+        bCfgEnable = True
+        if sFilter is None and sCfgFilter is None:
+            sEnable: str = None
+            sCfgEnable: str = None
+
+            sEnable = _dicLevel.get("bEnable")
+            if xCfgValue is not None and isinstance(xCfgValue, dict):
+                sCfgEnable = xCfgValue.get("bEnable")
+            # endif
+
+            xEval = None
+            xCfgEval = None
+
+            try:
+                if sEnable is not None:
+                    xEval = _xCfgVars.Process(sEnable)
+                    if isinstance(xEval, bool):
+                        bEnable = xEval
+                    elif isinstance(xEval, int):
+                        bEnable = xEval != 0
+                    elif isinstance(xEval, float):
+                        bEnable = xEval != 0.0
+                    else:
+                        raise RuntimeError(
+                            f"Manifest configuration enable expression must result in int, float or bool but is: {xEval}"
+                        )
+                    # endif
+                # endif
+            except Exception as xEx:
+                raise Exception(
+                    "Error in 'bEnable' manifest element for config with id '{0}':\n{1}".format(sId, str(xEx))
+                )
+            # endtrty
+
+            try:
+                if sCfgEnable is not None:
+                    xCfgEval = _xCfgVars.Process(sCfgEnable)
+                    if isinstance(xCfgEval, bool):
+                        bEnable = xCfgEval
+                    elif isinstance(xCfgEval, int):
+                        bEnable = xCfgEval != 0
+                    elif isinstance(xCfgEval, float):
+                        bEnable = xCfgEval != 0.0
+                    else:
+                        raise RuntimeError(
+                            f"Configuration enable expression must result in int, float or bool but is: {xCfgEval}"
+                        )
+                    # endif
+                # endif
+            except Exception as xEx:
+                raise Exception(
+                    "Error in 'bEnable' configuration element for config with id '{0}':\n{1}".format(sId, str(xEx))
+                )
+            # endtrty
+
+        # endif
+
+        return not (bTest and bCfgTest and bEnable and bCfgEnable)
 
     # enddef
 
