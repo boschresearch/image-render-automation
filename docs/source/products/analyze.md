@@ -97,6 +97,29 @@ cathy prod scan -c level-03 -p production
 
 If your production configuration is not in the same folder as the launch file, then you can also pass a relative or absolute path. The result of the scan is stored in a python pickle file in the `_output` folder of your workspace. You can also specify a different output file path using the command line option `-o`.
 
+### User Variable Details
+
+Apart from a display name for user variables, you can also specify a regular expression with the element `sRegExParseValue`. A folder is only accepted as part of a valid path, if it matches the regular expression. For example, if the reglar expression is `^(?!Frame_)(.+)`, only folders are accepted that do *not* start with `Frame_`. 
+
+You can also specify a replace regular expression using the element `sRegExReplaceValue`, which can be used in conjunction with `sRegExParseValue`, to replace the display value of the variable. For example, with
+
+    sRegExParseValue: "^Frame_(\\d+).png",
+    sRegExReplaceValue: "\\1"
+
+only filenames of the type `Frame_[number].png` are accepted, but only the extracted frame number is displayed in the viewer. A full user variable definition could look like this:
+
+```json
+{
+    "mVars": {
+        "myframe": {
+            "sName": "Frame",
+            "sRegExParseValue": "^Frame_(\\d+).png",
+            "sRegExReplaceValue": "\\1",
+        },
+    },
+}
+```
+
 ## The Production Analysis Configuration
 
 Currently, you can only analyze the file system scan for missing artefacts w.r.t. a single group path variable. The *group path* is the path structure specified under `sPathStructure` for the a group in the production configuration. For example, the variable `cfg` of the path structure, refers to a configuration index. One typical analysis is to find all those configuration indices for which an artefact is missing. The corresponding analysis configuration looks like this:
