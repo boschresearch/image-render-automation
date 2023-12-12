@@ -602,6 +602,26 @@ class CLoopConfigs:
                                 #     f"{iProcPass}> {sId} [{iLevelIdx}, {iDataListIdx}]: Store in cache [full: {xCML.bIsFullyProcessed}]"
                                 # )
                             # endif
+                        elif iProcPass == 2:
+                            xWarnings = xCML.GetWarnings()
+                            if xWarnings.bHasWarnings is True:
+                                sFilePath = config.GetDictValue(
+                                    xCfg,
+                                    "__locals__/filepath",
+                                    str,
+                                    bAllowKeyPath=True,
+                                    sWhere="configuration data",
+                                )
+
+                                print("\n================================================")
+                                print("PARSE WARNINGS:")
+                                print(f"Configuration '{sId}'")
+                                print(f"Path: {sFilePath}")
+                                print("---------------")
+                                print(xWarnings)
+                                print("================================================\n")
+                            # endif
+
                         # endif
                     # endif
                 except ison.ParserError as xEx:
