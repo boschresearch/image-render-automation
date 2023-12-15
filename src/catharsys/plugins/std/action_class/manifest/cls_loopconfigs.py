@@ -603,7 +603,9 @@ class CLoopConfigs:
                                 # )
                             # endif
                         elif iProcPass == 2:
-                            xWarnings = xCML.GetWarnings()
+                            xWarnings = xCML.GetWarnings().FilterList(
+                                {ison.EWarningType.UNDEF_VAR: ["for-each-object", "render"]}
+                            )
                             if xWarnings.bHasWarnings is True:
                                 sFilePath = config.GetDictValue(
                                     xCfg,
