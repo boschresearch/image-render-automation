@@ -452,6 +452,17 @@ class CGroup:
     # enddef
 
     # ######################################################################################################
+    def _RepresentsIntList(self, _lValues: list[str]):
+        try:
+            lInt = [int(x) for x in _lValues]
+        except Exception:
+            return False
+        # endtry
+        return True
+
+    # enddef
+
+    # ######################################################################################################
     def _ToInt(self, _sValue: str):
         return int(_sValue)
 
@@ -464,7 +475,7 @@ class CGroup:
         lVarValues = [list(x) for x in lVarValueSets[1:]]
         for lX in lVarValues:
             if len(lX) > 0:
-                if self._RepresentsInt(lX[0]) is True:
+                if self._RepresentsIntList(lX) is True:
                     lX.sort(key=self._ToInt)
                 else:
                     lX.sort()
@@ -644,7 +655,13 @@ class CGroup:
         for sArtType, lValueSets in dicArtVarValueSets.items():
             lValueLists = [list(x) for x in lValueSets]
             for lValues in lValueLists:
-                lValues.sort()
+                if len(lValues) > 0:
+                    if self._RepresentsIntList(lValues) is True:
+                        lValues.sort(key=self._ToInt)
+                    else:
+                        lValues.sort()
+                    # endif
+                # endif
             # endfor
             dicArtVarValueLists[sArtType] = lValueLists
         # endfor
