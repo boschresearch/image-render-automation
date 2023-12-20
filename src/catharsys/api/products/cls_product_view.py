@@ -24,12 +24,13 @@ import copy
 import enum
 from collections.abc import Iterable
 from pathlib import Path
-from typing import Optional, Callable, Union
+from typing import Optional, Callable, Union, Any
 
 from catharsys.api.products.cls_products import CProducts
 from catharsys.api.products.cls_group import CGroup, CArtefactType
 from catharsys.api.products.cls_path_structure import CPathStructure
 from catharsys.api.products.cls_node import CNode
+from catharsys.api.products.cls_category import CCategory
 
 from .cls_view_dim import CViewDim, CViewDimArtCommon, CViewDimArt, CViewDimArtType, CViewDimGrp, EViewDimType
 
@@ -59,6 +60,18 @@ class CViewDimNode:
     @property
     def sLabel(self) -> str:
         return self._xProdView.GetViewDimLabel(self._xViewDim)
+
+    # enddef
+
+    @property
+    def sVarId(self) -> str:
+        return self._xProdView.GetViewDimVarId(self._xViewDim)
+
+    # enddef
+
+    @property
+    def dicCategories(self) -> dict[str, Any]:
+        return self._xProdView.GetViewDimCategories(self._xViewDim)
 
     # enddef
 
@@ -128,6 +141,18 @@ class CViewDimNode:
 
     # enddef
 
+    @property
+    def lCategories(self) -> Iterable[dict[str, Any]]:
+        self._xViewDim.Reset()
+        while True:
+            yield self.dicCategories
+            if self._xViewDim.Next() is False:
+                break
+            # endif
+        # endwhile
+
+    # enddef
+
     def Reset(self):
         self._xViewDim.Reset()
 
@@ -180,9 +205,11 @@ class CProductView:
 
         self._lGrpVarValueLists: list[list[str]] = None
         self._lGrpVarLabelLists: list[list[str]] = None
+        self._lGrpVarCategoryLists: list[list[dict[str, Any]]] = None
 
         self._lSelGrpVarValueLists: list[list[str]] = None
         self._lSelGrpVarLabelLists: list[list[str]] = None
+        self._lSelGrpVarCategoryLists: list[list[dict[str, Any]]] = None
 
         self._dicArtVarValueLists: dict[str, list[list[str]]] = None
         self._dicArtVarTypeLists: dict[str, list[str]] = None
@@ -372,8 +399,35 @@ class CProductView:
     # enddef
 
     # ####################################################################################################################
+    def GetVarCategoryDefinition(self, _sCatId: str) -> CCategory:
+        return self._xProdGrp.GetVarCategoryDefinition(_sCatId)
+
+    # enddef
+
+    # ####################################################################################################################
+    def SetVarCategoryValue(
+        self,
+        *,
+        _sVarId: str,
+        _sVarValue: str,
+        _sCatId: str,
+        _xCatValue: Any,
+        _bDoSave: bool = True,
+    ):
+        self._xProdGrp.SetVarCategoryValue(
+            _sVarId=_sVarId,
+            _sVarValue=_sVarValue,
+            _sCatId=_sCatId,
+            _xCatValue=_xCatValue,
+            _bDoSave=_bDoSave,
+        )
+
+    # enddef
+
+    # ####################################################################################################################
     def GetMessages(self, _bDoClear: bool = True) -> list[str]:
         return self._xProdData.GetMessages(_bDoClear)
+
     # enddef
 
     # ####################################################################################################################
@@ -498,6 +552,7 @@ class CProductView:
         if self._xProdGrp.bHasData is True:
             self._lGrpVarValueLists = self._xProdGrp.GetGroupVarValueLists()
             self._lGrpVarLabelLists = self._xProdGrp.GetGroupVarLabelLists(self._lGrpVarValueLists)
+            self._lGrpVarCategoryLists = self._xProdGrp.GetGroupVarCategoryLists(self._lGrpVarValueLists)
         # endif
 
         return True
@@ -530,6 +585,34 @@ class CProductView:
     # enddef
 
     # ####################################################################################################################
+    def _GetCategoriesForSelValues(
+        self,
+        _lSelVarValueLists: list[list[str]],
+        _lVarValueLists: list[list[str]],
+        _lVarValCatLists: list[list[dict[str, Any]]],
+    ):
+        # Get list of labels for selected group values
+        lSelVarValCatLists: list[list[dict[str, Any]]] = []
+
+        for lSelVarValues, lVarValues, lValCatLists in zip(_lSelVarValueLists, _lVarValueLists, _lVarValCatLists):
+            lSelValCatLists: list[dict[str, Any]] = []
+            for sSelValue in lSelVarValues:
+                try:
+                    iIdx = lVarValues.index(sSelValue)
+                except Exception:
+                    raise RuntimeError(
+                        f"Selection value '{sSelValue}' not in available group variable values: {lVarValues}"
+                    )
+                # endtry
+                lSelValCatLists.append(lValCatLists[iIdx])
+            # endfor
+            lSelVarValCatLists.append(lSelValCatLists)
+        # endfor
+        return lSelVarValCatLists
+
+    # enddef
+
+    # ####################################################################################################################
     def SetSelectedGroupVarValueLists(self, _lSelGrpVarValueLists: list[list[str]]):
         if self._xProdGrp is None:
             raise RuntimeError("No group selected")
@@ -542,6 +625,9 @@ class CProductView:
         self._lSelGrpVarValueLists = _lSelGrpVarValueLists
         self._lSelGrpVarLabelLists = self._GetLabelsForSelValues(
             _lSelGrpVarValueLists, self._lGrpVarValueLists, self._lGrpVarLabelLists
+        )
+        self._lSelGrpVarCategoryLists = self._GetCategoriesForSelValues(
+            _lSelGrpVarValueLists, self._lGrpVarValueLists, self._lGrpVarCategoryLists
         )
 
         # Get artefact values for selected group values
@@ -774,6 +860,7 @@ class CProductView:
             iGrpVarIdx = self.lGrpPathVarIds.index(sGrpVarId)
             lGrpVarValues = self._lSelGrpVarValueLists[iGrpVarIdx]
             lGrpVarLabels = self._lSelGrpVarLabelLists[iGrpVarIdx]
+            lGrpVarCatergories = self._lSelGrpVarCategoryLists[iGrpVarIdx]
             if bRangeValid is False:
                 iMin = 0
                 iMax = len(lGrpVarValues) - 1
@@ -783,6 +870,7 @@ class CProductView:
                 _iVarIdx=iGrpVarIdx,
                 _lValues=lGrpVarValues,
                 _lLabels=lGrpVarLabels,
+                _lCategories=lGrpVarCatergories,
                 _iMin=iMin,
                 _iMax=iMax,
                 _sDimLabel=sDimLabel,
@@ -1042,6 +1130,57 @@ class CProductView:
             raise RuntimeError(f"Invalid view dimension object type: {_xViewDim._eType}")
         # endif
         return sValue
+
+    # enddef
+
+    # ##########################################################################################################
+    def GetViewDimVarId(self, _xViewDim: CViewDim) -> str:
+        sValue: str = None
+
+        if isinstance(_xViewDim, CViewDimGrp):
+            xVdg: CViewDimGrp = _xViewDim
+            sValue = xVdg.sVarId
+
+        elif isinstance(_xViewDim, CViewDimArtType):
+            pass
+
+        elif isinstance(_xViewDim, CViewDimArtCommon):
+            xVdac: CViewDimArtCommon = _xViewDim
+            sValue = xVdac.sVarId
+
+        elif isinstance(_xViewDim, CViewDimArt):
+            xVda: CViewDimArt = _xViewDim
+            sValue = xVda.sVarId
+
+        else:
+            raise RuntimeError(f"Invalid view dimension object type: {_xViewDim._eType}")
+        # endif
+        return sValue
+
+    # enddef
+
+    # ##########################################################################################################
+    def GetViewDimCategories(self, _xViewDim: CViewDim) -> dict[str, Any]:
+        dicValue: dict[str, Any] = None
+
+        if isinstance(_xViewDim, CViewDimGrp):
+            xVdg: CViewDimGrp = _xViewDim
+            dicValue = xVdg.dicCategories
+
+        elif isinstance(_xViewDim, CViewDimArtType):
+            dicValue = dict()
+
+        elif isinstance(_xViewDim, CViewDimArtCommon):
+            dicValue = dict()
+
+        elif isinstance(_xViewDim, CViewDimArt):
+            dicValue = dict()
+
+        else:
+            raise RuntimeError(f"Invalid view dimension object type: {_xViewDim._eType}")
+        # endif
+
+        return dicValue
 
     # enddef
 

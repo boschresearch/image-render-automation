@@ -26,7 +26,7 @@ import json
 from pathlib import Path
 from dataclasses import dataclass
 import anytree
-from typing import Union, Optional, Callable
+from typing import Union, Optional, Callable, Any
 
 # from anytree.exporter import DictExporter
 
@@ -39,6 +39,8 @@ from anybase.cls_any_error import CAnyError_Message
 
 from .cls_node import CNode, ENodeType
 from .cls_path_structure import CPathStructure, CPathVar, EPathVarType
+from .cls_category import CCategoryCollection, CCategory
+from .cls_category_data import CCategoryData
 
 
 @dataclass
@@ -74,6 +76,8 @@ class CGroup:
         self._xPathStruct: CPathStructure = None
         self._dicArtTypes: dict[str, CArtefactType] = None
         self._xTree: CNode = None
+        self._xCatCln: CCategoryCollection = CCategoryCollection()
+        self._xCatData: CCategoryData = CCategoryData()
 
         if _dicPathSystemVars is not None:
             self._dicPathSystemVars = _dicPathSystemVars
@@ -142,6 +146,7 @@ class CGroup:
 
         lAllowedElements: dict[str, type] = {
             "sName": str,
+            "lCategories": list,
             "sRegExParseValue": str,
             "sRegExReplaceValue": str,
         }
@@ -181,15 +186,29 @@ class CGroup:
     def FromConfig(self, _dicCfg: dict):
         self._dicVarValues = dict()
 
+        sPrjId: str = self._xProject.sId.replace("/", "-")
+        pathCatData: Path = self._xProject.xConfig.pathOutput / f"CategoryData_{sPrjId}_{self._sId}.json"
+        self._xCatData.FromFile(pathCatData)
+
         dicUserVars: dict = _dicCfg.get("mVars")
         self._AssertUserVarsDictValid(
             dicUserVars, f"Error parsing user variable definition of production group '{self._sId}'"
         )
 
+        print(f"dicUserVars: {dicUserVars}")
+
+        dicCategories: dict = _dicCfg.get("mCategories")
+        if dicCategories is not None and not isinstance(dicCategories, dict):
+            raise RuntimeError("Categories definition must be a dictionary")
+        elif dicCategories is not None:
+            self._xCatCln.FromConfigDict(dicCategories)
+        # endif
+
         self._sName = _dicCfg.get("sName", self._sId)
         self._xPathStruct = CPathStructure(
             _dicCfg["sPathStructure"],
             _dicUserVars=dicUserVars,
+            _xCatCln=self._xCatCln,
             _eLastElementNodeType=ENodeType.PATH,
             _dicSystemVars=self._dicPathSystemVars,
         )
@@ -249,6 +268,7 @@ class CGroup:
             xArtType.xPathStruct = CPathStructure(
                 dicArt["sPathStructure"],
                 _dicUserVars=dicUserVars,
+                _xCatCln=self._xCatCln,
                 _eLastElementNodeType=ENodeType.ARTEFACT,
                 _dicSystemVars=self._dicPathSystemVars,
             )
@@ -523,6 +543,82 @@ class CGroup:
     # enddef
 
     # ######################################################################################################
+    def GetVarCategoryDefinition(self, _sCatId: str) -> CCategory:
+        xCat = self._xCatCln.Get(_sCatId)
+        if xCat is None:
+            raise RuntimeError(f"Category '{_sCatId}' not defined for production group '{self._sId}'")
+        # endif
+        return xCat
+
+    # enddef
+
+    # ######################################################################################################
+    def SetVarCategoryValue(
+        self,
+        *,
+        _sVarId: str,
+        _sVarValue: str,
+        _sCatId: str,
+        _xCatValue: Any,
+        _bDoSave: bool = True,
+    ):
+        self._xCatData.SetValue(
+            _sVarId=_sVarId,
+            _sVarValue=_sVarValue,
+            _sCatId=_sCatId,
+            _xCatValue=_xCatValue,
+            _xCatCln=self._xCatCln,
+            _bDoSave=_bDoSave,
+        )
+
+    # enddef
+
+    # ######################################################################################################
+    def _GetVarCategoryLists(
+        self,
+        *,
+        _lVarValueLists: list[list[str]],
+        _xPathStruct: CPathStructure,
+    ) -> list[list[str]]:
+        lVarValCatLists: list[list[dict[str, Any]]] = []
+
+        for sVarId, lVarValues in zip(_xPathStruct.lPathVarIds, _lVarValueLists):
+            xVar: CPathVar = _xPathStruct.dicVars[sVarId]
+
+            lValCatLists: list[dict[str, Any]] = []
+            dicDataValCat = self._xCatData.dicVarValCat.get(sVarId)
+
+            for sVarValue in lVarValues:
+                dicDataCat: dict[str, Any] = None
+                if isinstance(dicDataValCat, dict):
+                    dicDataCat = dicDataValCat.get(sVarValue)
+                # endif
+
+                dicCatValue: dict[str, Any] = dict()
+
+                if isinstance(xVar.lCategories, list):
+                    # print(f"{sVarId}, {sVarValue} -> {([x.sId for x in xVar.lCategories])}")
+                    for xCat in xVar.lCategories:
+                        xCatValue = None
+                        if isinstance(dicDataCat, dict):
+                            xCatValue = dicDataCat.get(xCat.sId)
+                        # endif
+                        if xCatValue is None:
+                            xCatValue = xCat.GetDefaultValue()
+                        # endif
+                        dicCatValue[xCat.sId] = xCatValue
+                    # endfor
+                # endif
+                lValCatLists.append(dicCatValue)
+            # endfor
+            lVarValCatLists.append(lValCatLists)
+        # endfor
+
+        return lVarValCatLists
+
+    # enddef
+
+    # ######################################################################################################
     def GetGroupVarValueLists(self) -> list[list[str]]:
         iGroupVarCnt: int = self._xPathStruct.iPathVarCount
         return self._GetVarValueLists(_xNode=self._xTree, _iMaxLevel=iGroupVarCnt + 1)
@@ -532,6 +628,12 @@ class CGroup:
     # ######################################################################################################
     def GetGroupVarLabelLists(self, _lGrpVarValueLists: list[list[str]]) -> list[list[str]]:
         return self._GetVarLabelLists(_lVarValueLists=_lGrpVarValueLists, _xPathStruct=self._xPathStruct)
+
+    # enddef
+
+    # ######################################################################################################
+    def GetGroupVarCategoryLists(self, _lGrpVarValueLists: list[list[str]]) -> list[list[str]]:
+        return self._GetVarCategoryLists(_lVarValueLists=_lGrpVarValueLists, _xPathStruct=self._xPathStruct)
 
     # enddef
 

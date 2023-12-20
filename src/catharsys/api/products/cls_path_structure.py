@@ -27,6 +27,7 @@ from dataclasses import dataclass
 import enum
 
 from .cls_node import CNode, ENodeType
+from .cls_category import CCategoryCollection, CCategory
 
 
 class EPathVarType(enum.Enum):
@@ -59,6 +60,7 @@ class CPathVar:
     sReParseValue: str = None
     sReReplaceValue: str = None
     funcLabel: Callable[["CPathVar", str], str] = None
+    lCategories: list[CCategory] = None
 
 
 # endclass
@@ -70,6 +72,7 @@ class CPathStructure:
         _sPathStruct: str,
         _eLastElementNodeType: ENodeType,
         *,
+        _xCatCln: Optional[CCategoryCollection] = None,
         _dicUserVars: Optional[dict] = None,
         _dicSystemVars: Optional[dict[str, CPathVar]] = None,
     ):
@@ -78,6 +81,10 @@ class CPathStructure:
         self._lPathVars: list[str] = []
         self._dicVars: dict[str, CPathVar] = dict()
         self._dicSystemVars: dict[str, CPathVar] = _dicSystemVars
+        self._xCatCln: CCategoryCollection = _xCatCln
+        if self._xCatCln is None:
+            self._xCatCln = CCategoryCollection()
+        # endif
 
         # For some strange reason a deep copy of the system vars dictionary
         # gets slower and slower. I don't really know what it's doing,
@@ -130,6 +137,19 @@ class CPathStructure:
             elif sItem.startswith("?"):
                 sVarId = sItem[1:]
                 if isinstance(_dicUserVars, dict) and sVarId in _dicUserVars:
+                    lCat: list[CCategory] = []
+                    lUserCat: list[str] = _dicUserVars[sVarId].get("lCategories", [])
+                    print(f"_ParsePathStruct: {sVarId} > {lUserCat}")
+                    for sCatKey in lUserCat:
+                        xCat = self._xCatCln.Get(sCatKey)
+                        if xCat is None:
+                            raise RuntimeError(
+                                f"Category '{sCatKey}' specified in user variable '{sVarId}' is not defined"
+                            )
+                        # endif
+                        lCat.append(xCat)
+                    # endfor
+
                     self._dicVars[sVarId] = CPathVar(
                         sId=sVarId,
                         sName=_dicUserVars[sVarId].get("sName", sVarId),
@@ -137,6 +157,7 @@ class CPathStructure:
                         eNodeType=eNodeType,
                         sReParseValue=_dicUserVars[sVarId].get("sRegExParseValue"),
                         sReReplaceValue=_dicUserVars[sVarId].get("sRegExReplaceValue"),
+                        lCategories=lCat,
                     )
                 else:
                     self._dicVars[sVarId] = CPathVar(

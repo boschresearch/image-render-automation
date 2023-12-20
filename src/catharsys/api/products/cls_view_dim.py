@@ -21,6 +21,7 @@
 ###
 
 import enum
+from typing import Any
 
 
 class EViewDimType(enum.Enum):
@@ -107,6 +108,7 @@ class CViewDimGrp(CViewDim):
         _iVarIdx: int,
         _lValues: list[str],
         _lLabels: list[str],
+        _lCategories: list[dict[str, Any]],
         _iMin: int,
         _iMax: int,
         _sDimLabel: str = "",
@@ -116,6 +118,7 @@ class CViewDimGrp(CViewDim):
         self._iVarIdx: int = _iVarIdx
         self._lValues: list[str] = _lValues
         self._lLabels: list[str] = _lLabels
+        self._lCategories: list[dict[str, Any]] = _lCategories
         self._iCnt = len(self._lValues)
         self._iMin = _iMin
         self._iMax = _iMax
@@ -143,6 +146,12 @@ class CViewDimGrp(CViewDim):
     @property
     def sLabel(self) -> str:
         return self._lLabels[self._iIdx]
+
+    # enddef
+
+    @property
+    def dicCategories(self) -> dict[str, Any]:
+        return self._lCategories[self._iIdx]
 
     # enddef
 
