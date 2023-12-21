@@ -27,7 +27,7 @@ from dataclasses import dataclass
 import enum
 
 from .cls_node import CNode, ENodeType
-from .cls_category import CCategoryCollection, CCategory
+from .cls_category_collection import CCategoryCollection, CCategory
 
 
 class EPathVarType(enum.Enum):
@@ -139,7 +139,7 @@ class CPathStructure:
                 if isinstance(_dicUserVars, dict) and sVarId in _dicUserVars:
                     lCat: list[CCategory] = []
                     lUserCat: list[str] = _dicUserVars[sVarId].get("lCategories", [])
-                    print(f"_ParsePathStruct: {sVarId} > {lUserCat}")
+                    # print(f"_ParsePathStruct: {sVarId} > {lUserCat}")
                     for sCatKey in lUserCat:
                         xCat = self._xCatCln.Get(sCatKey)
                         if xCat is None:

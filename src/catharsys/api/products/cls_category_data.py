@@ -24,12 +24,13 @@ import enum
 from pathlib import Path
 from typing import Union, Any
 from anybase import config
-from .cls_category import CCategoryCollection
+from .cls_category_collection import CCategoryCollection
 
 
 class CCategoryData:
     def __init__(self):
         self._dicVarValCat: dict[str, dict[str, dict[str, Any]]] = dict()
+        self._xCatCln: CCategoryCollection = CCategoryCollection()
         self._pathFile: Path = None
         self._dicConfig: dict = None
 
@@ -41,24 +42,117 @@ class CCategoryData:
 
     # enddef
 
-    def FromFile(self, _pathFile: Path):
-        if not _pathFile.exists():
-            self._dicVarValCat.clear()
-            self._pathFile = _pathFile
-            self._dicConfig = {"sDTI": "/catharsys/production/category-data:1.0", "mData": self._dicVarValCat}
-        else:
-            self._pathFile = _pathFile
-            self._dicConfig: dict = config.Load(_pathFile, sDTI="/catharsys/production/category-data:1.0")
-            dicData = self._dicConfig.get("mData")
-            if not isinstance(dicData, dict):
-                self._dicVarValCat.clear()
-            else:
-                self._dicVarValCat = dicData
+    @property
+    def xCatCln(self) -> CCategoryCollection:
+        return self._xCatCln
+
+    # enddef
+
+    # ##################################################################################################
+    def Create(self, *, _pathFile: Path, _xCatCln: CCategoryCollection, _bReplace: bool = False):
+        """Create a new category data file. The file must not exist. If it exists, it can be replaced
+        by setting the _bReplace parameter to True.
+
+        Parameters
+        ----------
+        _pathFile : Path
+            The path to the category data file.
+        _xCatCln : CCategoryCollection
+            The category collection object.
+        _bReplace : bool, optional
+            If True, an existing category data file will be replaced. The default is False.
+        """
+        if _pathFile.exists() and _bReplace is False:
+            raise RuntimeError(f"Category data file already exists: {(_pathFile.as_posix())}")
+        elif _bReplace is True:
+            _pathFile.unlink()
+        # endif
+
+        self._dicVarValCat.clear()
+        self._pathFile = _pathFile
+        self._xCatCln = _xCatCln
+        self._dicConfig = {
+            "sDTI": "/catharsys/production/category-data:1.0",
+            "mCategories": self._xCatCln.ToDict(),
+            "mData": self._dicVarValCat,
+        }
+
+    # endif
+
+    # ##################################################################################################
+    def CopyCompatibleCategoryDataFrom(self, _xCatData: "CCategoryData", _bDoSave: bool = True):
+        """Copy the compatible category data from another category data object. Only those categories
+        are copied, which are compatible with the categories of this object.
+
+        Parameters
+        ----------
+        _xCatData : CCategoryData
+            The category data object to copy from.
+        """
+
+        # find compatible categories
+        lCompatibleCatIds: list[str] = list()
+        for sCatId, xCat in _xCatData._xCatCln._dicCat.items():
+            if sCatId in self._xCatCln and xCat.eType == self._xCatCln.Get(sCatId).eType:
+                lCompatibleCatIds.append(sCatId)
             # endif
+        # endfor
+
+        # copy the compatible categories
+        for sVarId, dicValCat in _xCatData._dicVarValCat.items():
+            for sValName, dicCat in dicValCat.items():
+                for sCatId in lCompatibleCatIds:
+                    if sCatId in dicCat:
+                        self.SetValue(
+                            _sVarId=sVarId,
+                            _sVarValue=sValName,
+                            _sCatId=sCatId,
+                            _xCatValue=dicCat[sCatId],
+                            _bDoSave=False,
+                        )
+                    # endif
+                # endfor
+            # endfor
+        # endfor
+
+        if _bDoSave is True:
+            self.SaveToFile()
+        # endif
+
+    # enddef
+
+    # ##################################################################################################
+    def FromFile(self, _pathFile: Path):
+        """Load the category data from a file. The file must exist and must be a valid category data.
+        Parameters
+        ----------
+        _pathFile : Path
+            The path to the category data file.
+        """
+        if not _pathFile.exists():
+            raise RuntimeError(f"Category data file does not exists: {(_pathFile.as_posix())}")
+        # endif
+
+        self._pathFile = _pathFile
+        self._dicConfig: dict = config.Load(_pathFile, sDTI="/catharsys/production/category-data:1.0")
+
+        dicData = self._dicConfig.get("mData")
+        if not isinstance(dicData, dict):
+            self._dicVarValCat.clear()
+        else:
+            self._dicVarValCat = dicData
+        # endif
+
+        dicCats: dict = self._dicConfig.get("mCategories")
+        if isinstance(dicCats, dict):
+            self._xCatCln.FromConfigDict(dicCats)
+        else:
+            raise RuntimeError("Category data is missing category definition block 'mCategories'")
         # endif
 
     # endif
 
+    # ##################################################################################################
     def SetValue(
         self,
         *,
@@ -66,10 +160,9 @@ class CCategoryData:
         _sVarValue: str,
         _sCatId: str,
         _xCatValue: Any,
-        _xCatCln: CCategoryCollection,
         _bDoSave: bool = True,
     ):
-        xCat = _xCatCln.Get(_sCatId)
+        xCat = self._xCatCln.Get(_sCatId)
         if xCat is None:
             raise RuntimeError(
                 f"Category '{_sCatId}' not defined. "
@@ -117,12 +210,31 @@ class CCategoryData:
             # endif
         # endif
 
+        if _bDoSave is True:
+            self.SaveToFile()
+        # endif
+
+    # enddef
+
+    # ##################################################################################################
+    def SaveToFile(self, _pathFile: Union[Path, None] = None):
+        if _pathFile is not None:
+            self._pathFile = _pathFile
+        # endif
+
         if "mData" not in self._dicConfig:
             self._dicConfig["mData"] = self._dicVarValCat
         # endif
 
-        if _bDoSave is True:
-            config.Save(self._pathFile, self._dicConfig)
+        config.Save(self._pathFile, self._dicConfig)
+
+    # enddef
+
+    # ##################################################################################################
+    def RenameFile(self, _pathFile: Path):
+        if self._pathFile is not None:
+            self._pathFile.rename(_pathFile)
+            self._pathFile = _pathFile
         # endif
 
     # enddef

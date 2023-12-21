@@ -22,17 +22,21 @@
 
 import enum
 from typing import Union, Any
-from anybase import config
+from dataclasses import dataclass
+
+from anybase import config, convert
 
 
 class ECategoryType(enum.Enum):
     NONE = enum.auto()
     BOOL = enum.auto()
+    BOOL_GROUP = enum.auto()
 
 
 # endclass
 
 
+# ##################################################################################################
 class CCategory:
     def __init__(self, *, _eType: ECategoryType, _sName: str, _sId: str):
         self._eType: ECategoryType = _eType
@@ -68,12 +72,16 @@ class CCategory:
 # endclass
 
 
+# ##################################################################################################
 class CCategoryTypeBool(CCategory):
-    def __init__(self, *, _sName: str, _sId: str, _sIconTrue: str = "", _sIconFalse: str = "", _sIconColor: str = ""):
-        super().__init__(_eType=ECategoryType.BOOL, _sName=_sName, _sId=_sId)
-        self._sIconTrue: str = _sIconTrue
-        self._sIconFalse: str = _sIconFalse
-        self._sIconColor: str = _sIconColor
+    def __init__(self, *, _dicData: dict[str, Any], _sKey: str):
+        sName = convert.DictElementToString(_dicData, "sName", sDefault=_sKey)
+
+        super().__init__(_eType=ECategoryType.BOOL, _sName=sName, _sId=_sKey)
+        self._bDefaultValue: bool = convert.DictElementToBool(_dicData, "bDefaultValue", bDefault=False)
+        self._sIconTrue: str = convert.DictElementToString(_dicData, "sIconTrue", sDefault="")
+        self._sIconFalse: str = convert.DictElementToString(_dicData, "sIconFalse", sDefault="")
+        self._sIconColor: str = convert.DictElementToString(_dicData, "sIconColor", sDefault="")
 
     # enddef
 
@@ -96,7 +104,19 @@ class CCategoryTypeBool(CCategory):
     # enddef
 
     def GetDefaultValue(self) -> Any:
-        return False
+        return self._bDefaultValue
+
+    # enddef
+
+    def ToDict(self) -> dict:
+        return {
+            "sDTI": "/catharsys/production/category/boolean:1.0",
+            "sName": self.sName,
+            "bDefaultValue": self._bDefaultValue,
+            "sIconTrue": self.sIconTrue,
+            "sIconFalse": self.sIconFalse,
+            "sIconColor": self.sIconColor,
+        }
 
     # enddef
 
@@ -104,64 +124,79 @@ class CCategoryTypeBool(CCategory):
 # endclass
 
 
-class CCategoryCollection:
-    def __init__(self):
-        self._dicCat: dict[str, CCategory] = dict()
+# ##################################################################################################
+@dataclass
+class CBoolGroupChoice:
+    sDescription: str = ""
+    sIcon: str = ""
+    sColor: str = ""
 
-    # enddef
 
-    def __contains__(self, _sKey: str) -> bool:
-        return _sKey in self._dicCat
+# endclass
 
-    # enddef
 
-    def FromConfigDict(self, _dicCfg: dict[str, dict]):
-        for sKey, dicData in _dicCfg.items():
-            if sKey.startswith("__"):
-                continue
+# ##################################################################################################
+class CCategoryTypeBoolGroup(CCategory):
+    def __init__(self, *, _dicData: dict[str, Any], _sKey: str):
+        sName = convert.DictElementToString(_dicData, "sName", sDefault=_sKey)
+        super().__init__(_eType=ECategoryType.BOOL_GROUP, _sName=sName, _sId=_sKey)
+
+        self._iDefaultValue = convert.DictElementToInt(_dicData, "iDefaultValue", iDefault=0)
+
+        self._lChoices: list[CBoolGroupChoice] = list()
+
+        lGroup: list[dict[str]] = _dicData.get("lGroup")
+        if lGroup is None:
+            raise RuntimeError(f"Category '{_sKey}' has no 'lGroup' element")
+        # endif
+        if not isinstance(lGroup, list):
+            raise RuntimeError(f"Category '{_sKey}' 'lGroup' element is not a list")
+        # endif
+        if len(lGroup) == 0:
+            raise RuntimeError(f"Category '{_sKey}' 'lGroup' element is empty")
+        # endif
+        for dicChoice in lGroup:
+            if not isinstance(dicChoice, dict):
+                raise RuntimeError(f"Category '{_sKey}' 'lGroup' element contains non-dictionary elements")
             # endif
 
-            if not isinstance(dicData, dict):
-                raise RuntimeError(f"Category '{sKey}' definition element has to be a dictionary")
-            # endif
-
-            xDtiInfo = config.CDtiInfo(config.CheckConfigType(dicData, "/catharsys/production/category/*:*"))
-            if xDtiInfo.bOk is False:
-                raise RuntimeError(f"Invalid DTI type for category definition '{sKey}': {xDtiInfo.sConfigDti}")
-            # endif
-            lType = xDtiInfo.lConfigType[3:]
-            if len(lType) == 0:
-                raise RuntimeError(
-                    f"No specific category type given for category definition '{sKey}': {xDtiInfo.sConfigDti}"
-                )
-            # endif
-            # lVer = xDtiInfo.lConfigVersion
-
-            sName = dicData.get("sName", sKey)
-
-            if lType[0] == "boolean":
-                sIconTrue = dicData.get("sIconTrue", "")
-                sIconFalse = dicData.get("sIconFalse", "")
-                sIconColor = dicData.get("sIconColor", "")
-                self._dicCat[sKey] = CCategoryTypeBool(
-                    _sName=sName,
-                    _sId=sKey,
-                    _sIconTrue=sIconTrue,
-                    _sIconFalse=sIconFalse,
-                    _sIconColor=sIconColor,
-                )
-            else:
-                raise RuntimeError(
-                    f"Unsupported specific category type '{(lType[0])}' for category definition '{sKey}'"
-                )
-            # endif
-
+            sDescription = convert.DictElementToString(dicChoice, "sDescription", sDefault="")
+            sIcon = convert.DictElementToString(dicChoice, "sIcon", sDefault="done")
+            sColor = convert.DictElementToString(dicChoice, "sColor", sDefault="")
+            self._lChoices.append(CBoolGroupChoice(sDescription=sDescription, sIcon=sIcon, sColor=sColor))
         # endfor
 
     # enddef
 
-    def Get(self, _sKey: str) -> Union[CCategory, None]:
-        return self._dicCat.get(_sKey)
+    @property
+    def lChoices(self) -> list[CBoolGroupChoice]:
+        return self._lChoices
+
+    # enddef
+
+    def GetDefaultValue(self) -> Any:
+        return self._iDefaultValue
+
+    # enddef
+
+    def ToDict(self) -> dict:
+        lGroup: list[dict[str, Any]] = list()
+        for xChoice in self._lChoices:
+            lGroup.append(
+                {
+                    "sDescription": xChoice.sDescription,
+                    "sIcon": xChoice.sIcon,
+                    "sColor": xChoice.sColor,
+                }
+            )
+        # endfor
+
+        return {
+            "sDTI": "/catharsys/production/category/boolean-group:1.0",
+            "sName": self.sName,
+            "iDefaultValue": self._iDefaultValue,
+            "lGroup": lGroup,
+        }
 
     # enddef
 

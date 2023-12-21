@@ -27,6 +27,7 @@ from pathlib import Path
 from dataclasses import dataclass
 import anytree
 from typing import Union, Optional, Callable, Any
+from datetime import datetime
 
 # from anytree.exporter import DictExporter
 
@@ -39,7 +40,7 @@ from anybase.cls_any_error import CAnyError_Message
 
 from .cls_node import CNode, ENodeType
 from .cls_path_structure import CPathStructure, CPathVar, EPathVarType
-from .cls_category import CCategoryCollection, CCategory
+from .cls_category_collection import CCategoryCollection, CCategory
 from .cls_category_data import CCategoryData
 
 
@@ -186,22 +187,40 @@ class CGroup:
     def FromConfig(self, _dicCfg: dict):
         self._dicVarValues = dict()
 
-        sPrjId: str = self._xProject.sId.replace("/", "-")
-        pathCatData: Path = self._xProject.xConfig.pathOutput / f"CategoryData_{sPrjId}_{self._sId}.json"
-        self._xCatData.FromFile(pathCatData)
-
         dicUserVars: dict = _dicCfg.get("mVars")
         self._AssertUserVarsDictValid(
             dicUserVars, f"Error parsing user variable definition of production group '{self._sId}'"
         )
 
-        print(f"dicUserVars: {dicUserVars}")
+        # print(f"dicUserVars: {dicUserVars}")
 
         dicCategories: dict = _dicCfg.get("mCategories")
         if dicCategories is not None and not isinstance(dicCategories, dict):
             raise RuntimeError("Categories definition must be a dictionary")
         elif dicCategories is not None:
             self._xCatCln.FromConfigDict(dicCategories)
+        # endif
+
+        sPrjId: str = self._xProject.sId.replace("/", "-")
+        pathCatData: Path = self._xProject.xConfig.pathOutput / f"CategoryData_{sPrjId}_{self._sId}.json"
+        if pathCatData.exists():
+            self._xCatData.FromFile(pathCatData)
+            if self._xCatData.xCatCln != self._xCatCln:
+                # get current date and time as string
+                sDateTime = datetime.now().strftime("%Y-%m-%d_%H-%M-%S")
+                pathOldCatData: Path = (
+                    self._xProject.xConfig.pathOutput / f"CategoryData_{sPrjId}_{self._sId}_{sDateTime}.json"
+                )
+                xOldCatData = self._xCatData
+                xOldCatData.RenameFile(pathOldCatData)
+                self._xCatData = CCategoryData()
+                self._xCatData.Create(_pathFile=pathCatData, _xCatCln=self._xCatCln)
+                self._xCatData.CopyCompatibleCategoryDataFrom(xOldCatData)
+                self._xCatData.SaveToFile()
+            # endif
+        else:
+            self._xCatData = CCategoryData()
+            self._xCatData.Create(_pathFile=pathCatData, _xCatCln=self._xCatCln)
         # endif
 
         self._sName = _dicCfg.get("sName", self._sId)
@@ -567,7 +586,6 @@ class CGroup:
             _sVarValue=_sVarValue,
             _sCatId=_sCatId,
             _xCatValue=_xCatValue,
-            _xCatCln=self._xCatCln,
             _bDoSave=_bDoSave,
         )
 
