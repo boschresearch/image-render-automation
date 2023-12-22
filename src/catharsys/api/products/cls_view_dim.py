@@ -168,6 +168,7 @@ class CViewDimArtCommon(CViewDim):
         _lVarIdx: list[int],
         _lValues: list[str],
         _lLabels: list[str],
+        _lCategories: list[dict[str, Any]],
         _iMin: int,
         _iMax: int,
         _sDimLabel: str = "",
@@ -178,6 +179,7 @@ class CViewDimArtCommon(CViewDim):
         self._sVarId: str = _sVarId
         self._lValues: list[str] = _lValues
         self._lLabels: list[str] = _lLabels
+        self._lCategories: list[dict[str, Any]] = _lCategories
         self._iCnt = len(self._lValues)
         self._iMin = _iMin
         self._iMax = _iMax
@@ -214,6 +216,12 @@ class CViewDimArtCommon(CViewDim):
 
     # enddef
 
+    @property
+    def dicCategories(self) -> dict[str, Any]:
+        return self._lCategories[self._iIdx]
+
+    # enddef
+
 
 # endclass
 
@@ -247,6 +255,7 @@ class CViewDimArt(CViewDim):
         _iVarIdx: int,
         _lValues: list[str],
         _lLabels: list[str],
+        _lCategories: list[dict[str, Any]],
         _iMin: int,
         _iMax: int,
         _sDimLabel: str = "",
@@ -257,6 +266,7 @@ class CViewDimArt(CViewDim):
         self._sVarId: str = _sVarId
         self._lValues: list[str] = _lValues
         self._lLabels: list[str] = _lLabels
+        self._lCategories: list[dict[str, Any]] = _lCategories
         self._iCnt = len(self._lValues)
         self._iMin = _iMin
         self._iMax = _iMax
@@ -290,6 +300,12 @@ class CViewDimArt(CViewDim):
     @property
     def sLabel(self) -> str:
         return self._lLabels[self._iIdx]
+
+    # enddef
+
+    @property
+    def dicCategories(self) -> dict[str, Any]:
+        return self._lCategories[self._iIdx]
 
     # enddef
 

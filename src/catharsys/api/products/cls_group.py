@@ -803,6 +803,19 @@ class CGroup:
 
     # enddef
 
+    # # ######################################################################################################
+    def GetArtefactVarCategories(self, _dicArtVarValueLists: dict[str, list[list[str]]]) -> dict[str, list[list[str]]]:
+        dicArtVarCatLists: dict[str, list[list[dict[str, Any]]]] = dict()
+        for sArtTypeId, lArtValueLists in _dicArtVarValueLists.items():
+            xArtType: CArtefactType = self._dicArtTypes[sArtTypeId]
+            dicArtVarCatLists[sArtTypeId] = self._GetVarCategoryLists(
+                _lVarValueLists=lArtValueLists, _xPathStruct=xArtType.xPathStruct
+            )
+        # endfor
+        return dicArtVarCatLists
+
+    # enddef
+
     # ######################################################################################################
     def GetGroupVarNode(self, _lGrpPath: list[str]) -> CNode:
         xNode: CNode = self._xTree
