@@ -214,13 +214,17 @@ class CGroup:
                 xOldCatData = self._xCatData
                 xOldCatData.RenameFile(pathOldCatData)
                 self._xCatData = CCategoryData()
-                self._xCatData.Create(_pathFile=pathCatData, _xCatCln=self._xCatCln)
+                self._xCatData.Create(
+                    _pathFile=pathCatData, _xCatCln=self._xCatCln, _sProjectId=self._xProject.sId, _sGroupId=self._sId
+                )
                 self._xCatData.CopyCompatibleCategoryDataFrom(xOldCatData)
                 self._xCatData.SaveToFile()
             # endif
         else:
             self._xCatData = CCategoryData()
-            self._xCatData.Create(_pathFile=pathCatData, _xCatCln=self._xCatCln)
+            self._xCatData.Create(
+                _pathFile=pathCatData, _xCatCln=self._xCatCln, _sProjectId=self._xProject.sId, _sGroupId=self._sId
+            )
         # endif
 
         self._sName = _dicCfg.get("sName", self._sId)
@@ -577,13 +581,15 @@ class CGroup:
         *,
         _sVarId: str,
         _sVarValue: str,
+        _xCatPath: "CViewDimNodePath",
         _sCatId: str,
         _xCatValue: Any,
         _bDoSave: bool = True,
-    ):
-        self._xCatData.SetValue(
+    ) -> dict[str, Any]:
+        return self._xCatData.SetValue(
             _sVarId=_sVarId,
             _sVarValue=_sVarValue,
+            _xCatPath=_xCatPath,
             _sCatId=_sCatId,
             _xCatValue=_xCatValue,
             _bDoSave=_bDoSave,
@@ -597,37 +603,38 @@ class CGroup:
         *,
         _lVarValueLists: list[list[str]],
         _xPathStruct: CPathStructure,
-    ) -> list[list[str]]:
-        lVarValCatLists: list[list[dict[str, Any]]] = []
+    ) -> list[list[dict[str, dict[str, Any]]]]:
+        lVarValCatLists: list[list[dict[str, dict[str, Any]]]] = []
 
         for sVarId, lVarValues in zip(_xPathStruct.lPathVarIds, _lVarValueLists):
             xVar: CPathVar = _xPathStruct.dicVars[sVarId]
 
             lValCatLists: list[dict[str, Any]] = []
-            dicDataValCat = self._xCatData.dicVarValCat.get(sVarId)
+            dicDataValCatPath = self._xCatData.dicVarValCatPath.get(sVarId)
 
             for sVarValue in lVarValues:
-                dicDataCat: dict[str, Any] = None
-                if isinstance(dicDataValCat, dict):
-                    dicDataCat = dicDataValCat.get(sVarValue)
+                dicDataCatPath: dict[str, dict[str, Any]] = None
+                if isinstance(dicDataValCatPath, dict):
+                    dicDataCatPath = dicDataValCatPath.get(sVarValue)
                 # endif
 
-                dicCatValue: dict[str, Any] = dict()
+                dicCatPathValue: dict[str, dict[str, Any]] = dict()
 
                 if isinstance(xVar.lCategories, list):
                     # print(f"{sVarId}, {sVarValue} -> {([x.sId for x in xVar.lCategories])}")
                     for xCat in xVar.lCategories:
-                        xCatValue = None
-                        if isinstance(dicDataCat, dict):
-                            xCatValue = dicDataCat.get(xCat.sId)
+                        dicPathValue: dict[str, Any] = dict()  # dict(__default__=xCat.GetDefaultValue())
+                        dicDataPathValue = None
+                        if isinstance(dicDataCatPath, dict):
+                            dicDataPathValue = dicDataCatPath.get(xCat.sId)
                         # endif
-                        if xCatValue is None:
-                            xCatValue = xCat.GetDefaultValue()
+                        if dicDataPathValue is not None:
+                            dicPathValue.update(dicDataPathValue)
                         # endif
-                        dicCatValue[xCat.sId] = xCatValue
+                        dicCatPathValue[xCat.sId] = dicPathValue
                     # endfor
                 # endif
-                lValCatLists.append(dicCatValue)
+                lValCatLists.append(dicCatPathValue)
             # endfor
             lVarValCatLists.append(lValCatLists)
         # endfor
@@ -650,7 +657,7 @@ class CGroup:
     # enddef
 
     # ######################################################################################################
-    def GetGroupVarCategoryLists(self, _lGrpVarValueLists: list[list[str]]) -> list[list[str]]:
+    def GetGroupVarCategoryLists(self, _lGrpVarValueLists: list[list[str]]) -> list[list[dict[str, dict[str, Any]]]]:
         return self._GetVarCategoryLists(_lVarValueLists=_lGrpVarValueLists, _xPathStruct=self._xPathStruct)
 
     # enddef
@@ -804,8 +811,10 @@ class CGroup:
     # enddef
 
     # # ######################################################################################################
-    def GetArtefactVarCategories(self, _dicArtVarValueLists: dict[str, list[list[str]]]) -> dict[str, list[list[str]]]:
-        dicArtVarCatLists: dict[str, list[list[dict[str, Any]]]] = dict()
+    def GetArtefactVarCategories(
+        self, _dicArtVarValueLists: dict[str, list[list[str]]]
+    ) -> dict[str, list[list[dict[str, dict[str, Any]]]]]:
+        dicArtVarCatLists: dict[str, list[list[dict[str, dict[str, Any]]]]] = dict()
         for sArtTypeId, lArtValueLists in _dicArtVarValueLists.items():
             xArtType: CArtefactType = self._dicArtTypes[sArtTypeId]
             dicArtVarCatLists[sArtTypeId] = self._GetVarCategoryLists(

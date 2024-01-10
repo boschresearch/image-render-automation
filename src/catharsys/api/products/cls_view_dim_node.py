@@ -23,7 +23,9 @@
 from collections.abc import Iterable
 from typing import Optional, Callable, Union, Any
 
-from .cls_view_dim import CViewDim
+from .cls_view_dim import CViewDim, CViewDimGrp, CViewDimArtCommon, CViewDimArt, CViewDimArtType, TCatPathValue
+from .cls_path_structure import CPathStructure, CPathVarHandlerResult, CPathVar, EPathVarType, ENodeType
+from .cls_group import CArtefactType
 
 
 # ##################################################################################################################
@@ -39,6 +41,12 @@ class CViewDimNode:
         else:
             self._xViewDim = self._xProdView.dicArtViewDims[self._sArtTypeId][self._iDimIdx]
         # endif
+
+    # enddef
+
+    @property
+    def xProdView(self) -> "CProductView":
+        return self._xProdView
 
     # enddef
 
@@ -61,7 +69,7 @@ class CViewDimNode:
     # enddef
 
     @property
-    def dicCategories(self) -> dict[str, Any]:
+    def dicCategories(self) -> TCatPathValue:
         return self._xProdView.GetViewDimCategories(self._xViewDim)
 
     # enddef
@@ -133,7 +141,7 @@ class CViewDimNode:
     # enddef
 
     @property
-    def lCategories(self) -> Iterable[dict[str, Any]]:
+    def lCategories(self) -> Iterable[TCatPathValue]:
         self._xViewDim.Reset()
         while True:
             yield self.dicCategories
