@@ -157,10 +157,12 @@ class CViewDimNodePath:
         xProdView: CProductView = _xViewDimNode.xProdView
         self._lGrpPath = ["*"] * xProdView.xGrpPathStruct.iPathVarCount
         self._lArtPath = []
-        self._sArtTypeId = None
+        self._sArtTypeId = "*"
+        lComViewDims: list[CViewDimArtCommon] = []
 
         if _xViewDimNode.sArtTypeId is None:
             iGrpDimCnt = max(0, _xViewDimNode.iDimIdx + 1 - _iParent)
+            iArtDimCnt = 0
         else:
             iGrpDimCnt = len(xProdView.lViewDims)
             iArtDimCnt = _xViewDimNode.iDimIdx + 1 - _iParent
@@ -173,29 +175,60 @@ class CViewDimNodePath:
         # endif
 
         for xViewDim in xProdView.lViewDims[0:iGrpDimCnt]:
+            # print(f"xViewDim.sDimLabel: {xViewDim.sDimLabel}")
+            # print(f"xViewDim._eType: {xViewDim._eType}")
+
             if isinstance(xViewDim, CViewDimGrp):
                 xVg: CViewDimGrp = xViewDim
                 self._lGrpPath[xVg.iVarIdx] = xVg.sValue
+
+            elif isinstance(xViewDim, CViewDimArtCommon):
+                lComViewDims.append(xViewDim)
+
+            elif isinstance(xViewDim, CViewDimArtType):
+                xVat: CViewDimArtType = xViewDim
+                self._sArtTypeId = xVat.sValue
             # endif
         # endfor
 
         self._sPath = "|".join(self._lGrpPath)
 
-        if self._sArtTypeId is not None:
+        if self._sArtTypeId != "*":
             xArtPathStruct: CPathStructure = xProdView.dicArtTypes[self._sArtTypeId].xPathStruct
             self._lArtPath = ["*"] * xArtPathStruct.iPathVarCount
 
-            for xViewDim in xProdView.dicArtViewDims[self._sArtTypeId][0:iArtDimCnt]:
-                if isinstance(xViewDim, CViewDimArtCommon):
-                    xVac: CViewDimArtCommon = xViewDim
-                    iArtIdx = xVac.lArtTypeIds.index(self._sArtTypeId)
-                    iVarIdx = xVac.lVarIdx[iArtIdx]
-                    self._lArtPath[iVarIdx] = xVac.sValue
-                elif isinstance(xViewDim, CViewDimArt):
-                    xVa: CViewDimArt = xViewDim
-                    self._lArtPath[xVa.iVarIdx] = xVa.sValue
-                # endif
+            for xVac in lComViewDims:
+                iArtIdx = xVac.lArtTypeIds.index(self._sArtTypeId)
+                iVarIdx = xVac.lVarIdx[iArtIdx]
+                self._lArtPath[iVarIdx] = xVac.sValue
             # endfor
+
+            # print(f"self._sArtTypeId: {self._sArtTypeId}")
+            # print(f"xProdView.dicArtViewDims: {xProdView.dicArtViewDims}")
+            if self._sArtTypeId in xProdView.dicArtViewDims and iArtDimCnt > 0:
+                for xViewDim in xProdView.dicArtViewDims[self._sArtTypeId][0:iArtDimCnt]:
+                    if isinstance(xViewDim, CViewDimArt):
+                        xVa: CViewDimArt = xViewDim
+                        self._lArtPath[xVa.iVarIdx] = xVa.sValue
+
+                    elif isinstance(xViewDim, CViewDimArtCommon):
+                        xVac: CViewDimArtCommon = xViewDim
+                        iArtIdx = xVac.lArtTypeIds.index(self._sArtTypeId)
+                        iVarIdx = xVac.lVarIdx[iArtIdx]
+                        self._lArtPath[iVarIdx] = xVac.sValue
+                    # endif
+                # endfor
+            # endif
+        else:
+            self._lArtPath = ["*"] * len(xProdView.lCommonArtVarIds)
+            for xVac in lComViewDims:
+                iVarIdx = xProdView.lCommonArtVarIds.index(xVac.sVarId)
+                self._lArtPath[iVarIdx] = xVac.sValue
+        # endfor
+
+        # endif
+
+        if len(self._lArtPath) > 0:
             self._sPath += f"&{self._sArtTypeId}&" + "|".join(self._lArtPath)
         # endif
 
