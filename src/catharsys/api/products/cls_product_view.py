@@ -21,154 +21,20 @@
 ###
 
 import copy
-import enum
 from collections.abc import Iterable
 from pathlib import Path
-from typing import Optional, Callable, Union
+from typing import Optional, Callable, Union, Any, TypeAlias
 
 from catharsys.api.products.cls_products import CProducts
 from catharsys.api.products.cls_group import CGroup, CArtefactType
 from catharsys.api.products.cls_path_structure import CPathStructure
 from catharsys.api.products.cls_node import CNode
+from catharsys.api.products.cls_category import CCategory
 
 from .cls_view_dim import CViewDim, CViewDimArtCommon, CViewDimArt, CViewDimArtType, CViewDimGrp, EViewDimType
+from .cls_view_dim_node import CViewDimNode
 
-
-# ##################################################################################################################
-# ##################################################################################################################
-class CViewDimNode:
-    def __init__(self, *, _xProdView: "CProductView", _iDimIdx: int, _sArtTypeId: Optional[str] = None):
-        self._xProdView: "CProductView" = _xProdView
-        self._iDimIdx: int = _iDimIdx
-        self._sArtTypeId: str = _sArtTypeId
-        self._xViewDim: CViewDim = None
-        if self._sArtTypeId is None:
-            self._xViewDim = self._xProdView.lViewDims[self._iDimIdx]
-        else:
-            self._xViewDim = self._xProdView.dicArtViewDims[self._sArtTypeId][self._iDimIdx]
-        # endif
-
-    # enddef
-
-    @property
-    def xViewDim(self) -> CViewDim:
-        return self._xViewDim
-
-    # enddef
-
-    @property
-    def sLabel(self) -> str:
-        return self._xProdView.GetViewDimLabel(self._xViewDim)
-
-    # enddef
-
-    @property
-    def sDimLabel(self) -> str:
-        return self._xViewDim.sDimLabel
-
-    # enddef
-
-    @property
-    def sValue(self) -> str:
-        return self._xProdView.GetViewDimValue(self._xViewDim)
-
-    # enddef
-
-    @property
-    def iRange(self) -> int:
-        return self._xViewDim.iRange
-
-    # enddef
-
-    @property
-    def iDimIdx(self) -> int:
-        return self._iDimIdx
-
-    # enddef
-
-    @property
-    def sArtTypeId(self) -> str:
-        return self._sArtTypeId
-
-    # enddef
-
-    @property
-    def bIsUniqueArtVar(self) -> bool:
-        return self._sArtTypeId is not None
-
-    # enddef
-
-    @property
-    def bIsUniqueArtVarStartNode(self) -> bool:
-        return self._sArtTypeId is not None and self._iDimIdx == 0
-
-    # enddef
-
-    @property
-    def lLabels(self) -> Iterable[str]:
-        self._xViewDim.Reset()
-        while True:
-            yield self.sLabel
-            if self._xViewDim.Next() is False:
-                break
-            # endif
-        # endwhile
-
-    # enddef
-
-    @property
-    def lValues(self) -> Iterable[str]:
-        self._xViewDim.Reset()
-        while True:
-            yield self.sValue
-            if self._xViewDim.Next() is False:
-                break
-            # endif
-        # endwhile
-
-    # enddef
-
-    def Reset(self):
-        self._xViewDim.Reset()
-
-    # enddef
-
-    def Next(self):
-        return self._xViewDim.Next()
-
-    # enddef
-
-    def NextDim(self) -> Optional["CViewDimNode"]:
-        iNextDim = self._iDimIdx + 1
-        if self._sArtTypeId is None:
-            if iNextDim < len(self._xProdView.lViewDims):
-                return CViewDimNode(_xProdView=self._xProdView, _iDimIdx=iNextDim)
-            # endif
-
-            sViewArtTypeId = self._xProdView.GetViewArtTypeId(_bDoRaise=False)
-            if sViewArtTypeId is None:
-                return None
-            # endif
-
-            lViewDims = self._xProdView.dicArtViewDims.get(sViewArtTypeId)
-            if lViewDims is None or len(lViewDims) == 0:
-                return None
-            # endif
-
-            return CViewDimNode(_xProdView=self._xProdView, _iDimIdx=0, _sArtTypeId=sViewArtTypeId)
-        # endif
-
-        lViewDims = self._xProdView.dicArtViewDims[self._sArtTypeId]
-        if iNextDim < len(lViewDims):
-            return CViewDimNode(_xProdView=self._xProdView, _iDimIdx=iNextDim, _sArtTypeId=self._sArtTypeId)
-        # endif
-
-        return None
-
-    # enddef
-
-
-# endclass
+TCatPathValue: TypeAlias = dict[str, dict[str, Any]]
 
 
 # ##################################################################################################################
@@ -180,12 +46,15 @@ class CProductView:
 
         self._lGrpVarValueLists: list[list[str]] = None
         self._lGrpVarLabelLists: list[list[str]] = None
+        self._lGrpVarCategoryLists: list[list[TCatPathValue]] = None
 
         self._lSelGrpVarValueLists: list[list[str]] = None
         self._lSelGrpVarLabelLists: list[list[str]] = None
+        self._lSelGrpVarCategoryLists: list[list[TCatPathValue]] = None
 
         self._dicArtVarValueLists: dict[str, list[list[str]]] = None
         self._dicArtVarTypeLists: dict[str, list[str]] = None
+        self._dicArtVarCategoryLists: dict[str, list[list[TCatPathValue]]] = None
 
         # dictionary of variable ids of selected artefact types
         self._dicSelArtTypeVarIds: dict[str, list[str]] = None
@@ -216,6 +85,7 @@ class CProductView:
 
         self._dicSelArtVarValueLists: dict[str, list[list[str]]] = dict()
         self._dicSelArtVarLabelLists: dict[str, list[list[str]]] = dict()
+        self._dicSelArtVarCategoryLists: dict[str, list[list[dict[str, Any]]]] = dict()
 
         self._dicSelActArtVarIds: dict[str, list[str]] = dict()
         self._dicSelActArtVarNames: dict[str, list[str]] = dict()
@@ -260,6 +130,12 @@ class CProductView:
     @property
     def xGrpPathStruct(self) -> CPathStructure:
         return self._xProdGrp.xPathStruct
+
+    # enddef
+
+    @property
+    def dicArtTypes(self) -> dict[str, CArtefactType]:
+        return self._xProdGrp.dicArtTypes
 
     # enddef
 
@@ -372,8 +248,48 @@ class CProductView:
     # enddef
 
     # ####################################################################################################################
+    def GetVarCategoryDefinition(self, _sCatId: str) -> CCategory:
+        return self._xProdGrp.GetVarCategoryDefinition(_sCatId)
+
+    # enddef
+
+    # ####################################################################################################################
+    def SetVarCategoryValue(
+        self,
+        *,
+        _sVarId: str,
+        _sVarValue: str,
+        _xCatPath: "CViewDimNodePath",
+        _sCatId: str,
+        _xCatValue: Any,
+        _xViewDim: CViewDim,
+        _iViewDimIdx: int,
+        _bDoSave: bool = True,
+    ):
+        dicPathValue = self._xProdGrp.SetVarCategoryValue(
+            _sVarId=_sVarId,
+            _sVarValue=_sVarValue,
+            _xCatPath=_xCatPath,
+            _sCatId=_sCatId,
+            _xCatValue=_xCatValue,
+            _bDoSave=_bDoSave,
+        )
+
+        self.SetViewDimCategory(_xViewDim, _iViewDimIdx, _sCatId, dicPathValue)
+
+        # print(f"_sVarId: {_sVarId}")
+        # print(f"_sVarValue: {_sVarValue}")
+        # print(f"_sCatId: {_sCatId}")
+        # print(f"_xCatValue: {_xCatValue}")
+        # print(f"dicPathValue: {dicPathValue}")
+        # print(f"self._lSelGrpVarCategoryLists: {self._lSelGrpVarCategoryLists}")
+
+    # enddef
+
+    # ####################################################################################################################
     def GetMessages(self, _bDoClear: bool = True) -> list[str]:
         return self._xProdData.GetMessages(_bDoClear)
+
     # enddef
 
     # ####################################################################################################################
@@ -498,6 +414,7 @@ class CProductView:
         if self._xProdGrp.bHasData is True:
             self._lGrpVarValueLists = self._xProdGrp.GetGroupVarValueLists()
             self._lGrpVarLabelLists = self._xProdGrp.GetGroupVarLabelLists(self._lGrpVarValueLists)
+            self._lGrpVarCategoryLists = self._xProdGrp.GetGroupVarCategoryLists(self._lGrpVarValueLists)
         # endif
 
         return True
@@ -530,6 +447,34 @@ class CProductView:
     # enddef
 
     # ####################################################################################################################
+    def _GetCategoriesForSelValues(
+        self,
+        _lSelVarValueLists: list[list[str]],
+        _lVarValueLists: list[list[str]],
+        _lVarValCatLists: list[list[TCatPathValue]],
+    ):
+        # Get list of labels for selected group values
+        lSelVarValCatLists: list[list[TCatPathValue]] = []
+
+        for lSelVarValues, lVarValues, lValCatLists in zip(_lSelVarValueLists, _lVarValueLists, _lVarValCatLists):
+            lSelValCatLists: list[TCatPathValue] = []
+            for sSelValue in lSelVarValues:
+                try:
+                    iIdx = lVarValues.index(sSelValue)
+                except Exception:
+                    raise RuntimeError(
+                        f"Selection value '{sSelValue}' not in available group variable values: {lVarValues}"
+                    )
+                # endtry
+                lSelValCatLists.append(lValCatLists[iIdx])
+            # endfor
+            lSelVarValCatLists.append(lSelValCatLists)
+        # endfor
+        return lSelVarValCatLists
+
+    # enddef
+
+    # ####################################################################################################################
     def SetSelectedGroupVarValueLists(self, _lSelGrpVarValueLists: list[list[str]]):
         if self._xProdGrp is None:
             raise RuntimeError("No group selected")
@@ -543,10 +488,14 @@ class CProductView:
         self._lSelGrpVarLabelLists = self._GetLabelsForSelValues(
             _lSelGrpVarValueLists, self._lGrpVarValueLists, self._lGrpVarLabelLists
         )
+        self._lSelGrpVarCategoryLists = self._GetCategoriesForSelValues(
+            _lSelGrpVarValueLists, self._lGrpVarValueLists, self._lGrpVarCategoryLists
+        )
 
         # Get artefact values for selected group values
         self._dicArtVarValueLists, self._dicArtVarTypeLists = self._xProdGrp.GetArtefactVarValues(_lSelGrpVarValueLists)
         self._dicArtVarLabelLists = self._xProdGrp.GetArtefactVarLabels(self._dicArtVarValueLists)
+        self._dicArtVarCategoryLists = self._xProdGrp.GetArtefactVarCategories(self._dicArtVarValueLists)
 
         # List of group variable ids where more than one value is selected.
         # These are the variables that we can iterate over.
@@ -590,6 +539,7 @@ class CProductView:
     def ClearArtefactVarSelection(self):
         self._dicSelArtVarValueLists = dict()
         self._dicSelArtVarLabelLists = dict()
+        self._dicSelArtVarCategoryLists = dict()
         self._dicSelActArtVarIds = dict()
         self._dicSelActArtVarNames = dict()
         self._lSelActArtTypeIds = []
@@ -608,6 +558,13 @@ class CProductView:
         self._dicSelArtVarLabelLists[_sArtTypeId] = self._GetLabelsForSelValues(
             _lSelArtVarValueLists, self._dicArtVarValueLists[_sArtTypeId], self._dicArtVarLabelLists[_sArtTypeId]
         )
+
+        self._dicSelArtVarCategoryLists[_sArtTypeId] = self._GetCategoriesForSelValues(
+            _lSelArtVarValueLists, self._dicArtVarValueLists[_sArtTypeId], self._dicArtVarCategoryLists[_sArtTypeId]
+        )
+
+        # print(f"self._dicArtVarCategoryLists: {self._dicArtVarCategoryLists}")
+        # print(f"self._dicSelArtVarCategoryLists: {self._dicSelArtVarCategoryLists}")
 
         # List of artefact variable ids where more than one value is selected.
         # These are the variables that we can iterate over.
@@ -762,7 +719,18 @@ class CProductView:
         _sArtTypeId: Optional[str] = None,
     ):
         sDimId, eDimType = self.GetDimIdType(_sDimKey)
-        sDimLabel = self._dicViewDimNames.get(_sDimKey, "")
+        sDimLabel = self._dicViewDimNames.get(_sDimKey)
+
+        if sDimLabel is None:
+            if _sArtTypeId is not None:
+                dicDimNames = self._dicArtViewDimNames.get(_sArtTypeId)
+                if dicDimNames is not None:
+                    sDimLabel = dicDimNames.get(_sDimKey)
+                # endif
+            else:
+                sDimLabel = ""
+            # endif
+        # endif
 
         bRangeValid: bool = _iRangeMin is not None and _iRangeMax is not None
         iMin: int = _iRangeMin
@@ -774,6 +742,7 @@ class CProductView:
             iGrpVarIdx = self.lGrpPathVarIds.index(sGrpVarId)
             lGrpVarValues = self._lSelGrpVarValueLists[iGrpVarIdx]
             lGrpVarLabels = self._lSelGrpVarLabelLists[iGrpVarIdx]
+            lGrpVarCatergories = self._lSelGrpVarCategoryLists[iGrpVarIdx]
             if bRangeValid is False:
                 iMin = 0
                 iMax = len(lGrpVarValues) - 1
@@ -783,6 +752,7 @@ class CProductView:
                 _iVarIdx=iGrpVarIdx,
                 _lValues=lGrpVarValues,
                 _lLabels=lGrpVarLabels,
+                _lCategories=lGrpVarCatergories,
                 _iMin=iMin,
                 _iMax=iMax,
                 _sDimLabel=sDimLabel,
@@ -795,6 +765,7 @@ class CProductView:
             lArtVarIdx: list[int] = []
             lArtVarValues: list[str] = None
             lArtVarLabels: list[str] = None
+            lArtVarCatergories: list[dict[str, Any]] = None
             for sArtTypeId in lArtTypeIds:
                 xArtType: CArtefactType = self._xProdGrp.dicArtTypes[sArtTypeId]
                 lArtVarIds = xArtType.xPathStruct.lPathVarIds
@@ -803,6 +774,7 @@ class CProductView:
                 if lArtVarValues is None:
                     lArtVarValues = self._dicSelArtVarValueLists[sArtTypeId][iArtVarIdx]
                     lArtVarLabels = self._dicSelArtVarLabelLists[sArtTypeId][iArtVarIdx]
+                    lArtVarCatergories = self._dicSelArtVarCategoryLists[sArtTypeId][iArtVarIdx]
                 # endif
             # endfor
             if bRangeValid is False:
@@ -813,6 +785,7 @@ class CProductView:
                 _sVarId=sArtVarId,
                 _lValues=lArtVarValues,
                 _lLabels=lArtVarLabels,
+                _lCategories=lArtVarCatergories,
                 _lArtTypeIds=lArtTypeIds,
                 _lVarIdx=lArtVarIdx,
                 _iMin=iMin,
@@ -832,6 +805,7 @@ class CProductView:
             iArtVarIdx = lArtVarIds.index(sArtVarId)
             lArtVarValues = self._dicSelArtVarValueLists[_sArtTypeId][iArtVarIdx]
             lArtVarLabels = self._dicSelArtVarLabelLists[_sArtTypeId][iArtVarIdx]
+            lArtVarCatergories = self._dicSelArtVarCategoryLists[_sArtTypeId][iArtVarIdx]
             if bRangeValid is False:
                 iMin = 0
                 iMax = len(lArtVarValues) - 1
@@ -843,6 +817,7 @@ class CProductView:
                 _iVarIdx=iArtVarIdx,
                 _lValues=lArtVarValues,
                 _lLabels=lArtVarLabels,
+                _lCategories=lArtVarCatergories,
                 _iMin=iMin,
                 _iMax=iMax,
                 _sDimLabel=sDimLabel,
@@ -898,6 +873,7 @@ class CProductView:
 
     # enddef
 
+    # ####################################################################################################################
     # ####################################################################################################################
     def GetViewDimNodeIterationValue(self) -> tuple[CNode, CArtefactType]:
         xViewDim: CViewDim = None
@@ -1042,6 +1018,84 @@ class CProductView:
             raise RuntimeError(f"Invalid view dimension object type: {_xViewDim._eType}")
         # endif
         return sValue
+
+    # enddef
+
+    # ##########################################################################################################
+    def GetViewDimVarId(self, _xViewDim: CViewDim) -> str:
+        sValue: str = None
+
+        if isinstance(_xViewDim, CViewDimGrp):
+            xVdg: CViewDimGrp = _xViewDim
+            sValue = xVdg.sVarId
+
+        elif isinstance(_xViewDim, CViewDimArtType):
+            pass
+
+        elif isinstance(_xViewDim, CViewDimArtCommon):
+            xVdac: CViewDimArtCommon = _xViewDim
+            sValue = xVdac.sVarId
+
+        elif isinstance(_xViewDim, CViewDimArt):
+            xVda: CViewDimArt = _xViewDim
+            sValue = xVda.sVarId
+
+        else:
+            raise RuntimeError(f"Invalid view dimension object type: {_xViewDim._eType}")
+        # endif
+        return sValue
+
+    # enddef
+
+    # ##########################################################################################################
+    def GetViewDimCategories(self, _xViewDim: CViewDim) -> TCatPathValue:
+        dicValue: TCatPathValue = None
+
+        if isinstance(_xViewDim, CViewDimGrp):
+            xVdg: CViewDimGrp = _xViewDim
+            dicValue = xVdg.dicCategories
+
+        elif isinstance(_xViewDim, CViewDimArtType):
+            dicValue = dict()
+
+        elif isinstance(_xViewDim, CViewDimArtCommon):
+            xVdac: CViewDimArtCommon = _xViewDim
+            dicValue = xVdac.dicCategories
+
+        elif isinstance(_xViewDim, CViewDimArt):
+            xVda: CViewDimArt = _xViewDim
+            dicValue = xVda.dicCategories
+
+        else:
+            raise RuntimeError(f"Invalid view dimension object type: {_xViewDim._eType}")
+        # endif
+
+        return dicValue
+
+    # enddef
+
+    # ##########################################################################################################
+    def SetViewDimCategory(
+        self, _xViewDim: CViewDim, _iViewDimIdx: int, _sCatId: str, _dicPathValue: dict[str, Any]
+    ) -> None:
+        if isinstance(_xViewDim, CViewDimGrp):
+            xVdg: CViewDimGrp = _xViewDim
+            xVdg.SetCategory(_dicPathValue, _sCatId, _iIdx=_iViewDimIdx)
+
+        elif isinstance(_xViewDim, CViewDimArtType):
+            pass
+
+        elif isinstance(_xViewDim, CViewDimArtCommon):
+            xVdac: CViewDimArtCommon = _xViewDim
+            xVdac.SetCategory(_dicPathValue, _sCatId, _iIdx=_iViewDimIdx)
+
+        elif isinstance(_xViewDim, CViewDimArt):
+            xVda: CViewDimArt = _xViewDim
+            xVda.SetCategory(_dicPathValue, _sCatId, _iIdx=_iViewDimIdx)
+
+        else:
+            raise RuntimeError(f"Invalid view dimension object type: {_xViewDim._eType}")
+        # endif
 
     # enddef
 

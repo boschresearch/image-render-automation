@@ -40,7 +40,8 @@ from .cls_node import ENodeType
 
 
 class CProducts:
-    c_reFrame: re.Pattern = re.compile(r"Frame_(\d+)\.(.+)")
+    c_reFrame: re.Pattern = re.compile(r"Frame_[0]*(\d+)\.(.+)")
+    c_reRenderQuality: re.Pattern = re.compile(r"rq[0]*(\d+)")
 
     def __init__(
         self,
@@ -74,8 +75,6 @@ class CProducts:
                 eType=EPathVarType.SYSTEM,
                 eNodeType=ENodeType.PATH,
                 funcHandler=self._OnVarRq,
-                sReParseValue=r"rq[0]*(\d+)",
-                sReReplaceValue=r"\1",
             ),
             "project": CPathVar(
                 sId="project",
@@ -90,8 +89,6 @@ class CProducts:
                 eType=EPathVarType.SYSTEM,
                 eNodeType=ENodeType.ARTEFACT,
                 funcHandler=self._OnVarFrame,
-                sReParseValue=r"Frame_[0]*(\d+)\..+",
-                sReReplaceValue=r"\1",
             ),
         }
 
@@ -365,11 +362,12 @@ class CProducts:
             raise RuntimeError("Path variable 'rq' must not be the first element of a path structure")
         # endif
         for pathItem in _pathScan.iterdir():
-            if not pathItem.is_dir() or not pathItem.name.startswith("rq"):
+            xMatch = CProducts.c_reRenderQuality.fullmatch(pathItem.name)
+            if not pathItem.is_dir() or xMatch is None:
                 continue
             # endif
 
-            yield CPathVarHandlerResult(pathItem, pathItem.name, int(pathItem.name[2:]))
+            yield CPathVarHandlerResult(pathItem, xMatch.group(1), int(xMatch.group(1)), pathItem.name)
         # endfor
 
     # enddef
@@ -398,7 +396,9 @@ class CProducts:
             if not pathItem.is_file() or xMatch is None:
                 continue
             # endif
-            yield CPathVarHandlerResult(pathItem, pathItem.stem, (int(xMatch.group(1)), xMatch.group(2)), pathItem.name)
+            yield CPathVarHandlerResult(
+                pathItem, xMatch.group(1), (int(xMatch.group(1)), xMatch.group(2)), pathItem.name
+            )
         # endfor
 
     # enddef

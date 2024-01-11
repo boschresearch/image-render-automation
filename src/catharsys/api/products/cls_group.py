@@ -26,7 +26,8 @@ import json
 from pathlib import Path
 from dataclasses import dataclass
 import anytree
-from typing import Union, Optional, Callable
+from typing import Union, Optional, Callable, Any
+from datetime import datetime
 
 # from anytree.exporter import DictExporter
 
@@ -39,6 +40,8 @@ from anybase.cls_any_error import CAnyError_Message
 
 from .cls_node import CNode, ENodeType
 from .cls_path_structure import CPathStructure, CPathVar, EPathVarType
+from .cls_category_collection import CCategoryCollection, CCategory
+from .cls_category_data import CCategoryData
 
 
 @dataclass
@@ -74,6 +77,8 @@ class CGroup:
         self._xPathStruct: CPathStructure = None
         self._dicArtTypes: dict[str, CArtefactType] = None
         self._xTree: CNode = None
+        self._xCatCln: CCategoryCollection = CCategoryCollection()
+        self._xCatData: CCategoryData = CCategoryData()
 
         if _dicPathSystemVars is not None:
             self._dicPathSystemVars = _dicPathSystemVars
@@ -142,6 +147,7 @@ class CGroup:
 
         lAllowedElements: dict[str, type] = {
             "sName": str,
+            "lCategories": list,
             "sRegExParseValue": str,
             "sRegExReplaceValue": str,
         }
@@ -186,12 +192,24 @@ class CGroup:
             dicUserVars, f"Error parsing user variable definition of production group '{self._sId}'"
         )
 
+        dicUserSysVars: dict = _dicCfg.get("mSystemVars")
+
+        # Initialize category data collection
+        dicCategories: dict = _dicCfg.get("mCategories")
+        if dicCategories is not None and not isinstance(dicCategories, dict):
+            raise RuntimeError("Categories definition must be a dictionary")
+        elif dicCategories is not None:
+            self._xCatCln.FromConfigDict(dicCategories)
+        # endif
+
         self._sName = _dicCfg.get("sName", self._sId)
         self._xPathStruct = CPathStructure(
             _dicCfg["sPathStructure"],
             _dicUserVars=dicUserVars,
+            _xCatCln=self._xCatCln,
             _eLastElementNodeType=ENodeType.PATH,
             _dicSystemVars=self._dicPathSystemVars,
+            _dicUserSysVars=dicUserSysVars,
         )
 
         for sVarId, xPathVar in self._xPathStruct.dicVars.items():
@@ -249,8 +267,10 @@ class CGroup:
             xArtType.xPathStruct = CPathStructure(
                 dicArt["sPathStructure"],
                 _dicUserVars=dicUserVars,
+                _xCatCln=self._xCatCln,
                 _eLastElementNodeType=ENodeType.ARTEFACT,
                 _dicSystemVars=self._dicPathSystemVars,
+                _dicUserSysVars=dicUserSysVars,
             )
             xArtType.dicMeta = dicArt.get("mMeta")
             self._dicArtTypes[sArtId] = xArtType
@@ -266,6 +286,39 @@ class CGroup:
             # endfor
 
         # endfor
+
+        # Meta data for category data collection
+        dicMeta = {
+            "sProjectId": self._xProject.sId,
+            "sGroupId": self._sId,
+            "sGroupName": self._sName,
+            "lGroupPathStructure": self._xPathStruct.lPathVarIds,
+            "mArtefactPathStructures": {
+                sArtId: xArtType.xPathStruct.lPathVarIds for sArtId, xArtType in self._dicArtTypes.items()
+            },
+        }
+
+        sPrjId: str = self._xProject.sId.replace("/", "-")
+        pathCatData: Path = self._xProject.xConfig.pathOutput / f"CategoryData_{sPrjId}_{self._sId}.json"
+        if pathCatData.exists():
+            self._xCatData.FromFile(pathCatData)
+            if self._xCatData.xCatCln != self._xCatCln:
+                # get current date and time as string
+                sDateTime = datetime.now().strftime("%Y-%m-%d_%H-%M-%S")
+                pathOldCatData: Path = (
+                    self._xProject.xConfig.pathOutput / f"CategoryData_{sPrjId}_{self._sId}_{sDateTime}.json"
+                )
+                xOldCatData = self._xCatData
+                xOldCatData.RenameFile(pathOldCatData)
+                self._xCatData = CCategoryData()
+                self._xCatData.Create(_pathFile=pathCatData, _xCatCln=self._xCatCln, _dicMeta=dicMeta)
+                self._xCatData.CopyCompatibleCategoryDataFrom(xOldCatData)
+                self._xCatData.SaveToFile()
+            # endif
+        else:
+            self._xCatData = CCategoryData()
+            self._xCatData.Create(_pathFile=pathCatData, _xCatCln=self._xCatCln, _dicMeta=dicMeta)
+        # endif
 
     # enddef
 
@@ -523,6 +576,84 @@ class CGroup:
     # enddef
 
     # ######################################################################################################
+    def GetVarCategoryDefinition(self, _sCatId: str) -> CCategory:
+        xCat = self._xCatCln.Get(_sCatId)
+        if xCat is None:
+            raise RuntimeError(f"Category '{_sCatId}' not defined for production group '{self._sId}'")
+        # endif
+        return xCat
+
+    # enddef
+
+    # ######################################################################################################
+    def SetVarCategoryValue(
+        self,
+        *,
+        _sVarId: str,
+        _sVarValue: str,
+        _xCatPath: "CViewDimNodePath",
+        _sCatId: str,
+        _xCatValue: Any,
+        _bDoSave: bool = True,
+    ) -> dict[str, Any]:
+        return self._xCatData.SetValue(
+            _sVarId=_sVarId,
+            _sVarValue=_sVarValue,
+            _xCatPath=_xCatPath,
+            _sCatId=_sCatId,
+            _xCatValue=_xCatValue,
+            _bDoSave=_bDoSave,
+        )
+
+    # enddef
+
+    # ######################################################################################################
+    def _GetVarCategoryLists(
+        self,
+        *,
+        _lVarValueLists: list[list[str]],
+        _xPathStruct: CPathStructure,
+    ) -> list[list[dict[str, dict[str, Any]]]]:
+        lVarValCatLists: list[list[dict[str, dict[str, Any]]]] = []
+
+        for sVarId, lVarValues in zip(_xPathStruct.lPathVarIds, _lVarValueLists):
+            xVar: CPathVar = _xPathStruct.dicVars[sVarId]
+
+            lValCatLists: list[dict[str, Any]] = []
+            dicDataValCatPath = self._xCatData.dicVarValCatPath.get(sVarId)
+
+            for sVarValue in lVarValues:
+                dicDataCatPath: dict[str, dict[str, Any]] = None
+                if isinstance(dicDataValCatPath, dict):
+                    dicDataCatPath = dicDataValCatPath.get(sVarValue)
+                # endif
+
+                dicCatPathValue: dict[str, dict[str, Any]] = dict()
+
+                if isinstance(xVar.lCategories, list):
+                    # print(f"{sVarId}, {sVarValue} -> {([x.sId for x in xVar.lCategories])}")
+                    for xCat in xVar.lCategories:
+                        dicPathValue: dict[str, Any] = dict()  # dict(__default__=xCat.GetDefaultValue())
+                        dicDataPathValue = None
+                        if isinstance(dicDataCatPath, dict):
+                            dicDataPathValue = dicDataCatPath.get(xCat.sId)
+                        # endif
+                        if dicDataPathValue is not None:
+                            dicPathValue.update(dicDataPathValue)
+                        # endif
+                        dicCatPathValue[xCat.sId] = dicPathValue
+                    # endfor
+                # endif
+                lValCatLists.append(dicCatPathValue)
+            # endfor
+            lVarValCatLists.append(lValCatLists)
+        # endfor
+
+        return lVarValCatLists
+
+    # enddef
+
+    # ######################################################################################################
     def GetGroupVarValueLists(self) -> list[list[str]]:
         iGroupVarCnt: int = self._xPathStruct.iPathVarCount
         return self._GetVarValueLists(_xNode=self._xTree, _iMaxLevel=iGroupVarCnt + 1)
@@ -532,6 +663,12 @@ class CGroup:
     # ######################################################################################################
     def GetGroupVarLabelLists(self, _lGrpVarValueLists: list[list[str]]) -> list[list[str]]:
         return self._GetVarLabelLists(_lVarValueLists=_lGrpVarValueLists, _xPathStruct=self._xPathStruct)
+
+    # enddef
+
+    # ######################################################################################################
+    def GetGroupVarCategoryLists(self, _lGrpVarValueLists: list[list[str]]) -> list[list[dict[str, dict[str, Any]]]]:
+        return self._GetVarCategoryLists(_lVarValueLists=_lGrpVarValueLists, _xPathStruct=self._xPathStruct)
 
     # enddef
 
@@ -680,6 +817,21 @@ class CGroup:
             )
         # endfor
         return dicArtVarLabelLists
+
+    # enddef
+
+    # # ######################################################################################################
+    def GetArtefactVarCategories(
+        self, _dicArtVarValueLists: dict[str, list[list[str]]]
+    ) -> dict[str, list[list[dict[str, dict[str, Any]]]]]:
+        dicArtVarCatLists: dict[str, list[list[dict[str, dict[str, Any]]]]] = dict()
+        for sArtTypeId, lArtValueLists in _dicArtVarValueLists.items():
+            xArtType: CArtefactType = self._dicArtTypes[sArtTypeId]
+            dicArtVarCatLists[sArtTypeId] = self._GetVarCategoryLists(
+                _lVarValueLists=lArtValueLists, _xPathStruct=xArtType.xPathStruct
+            )
+        # endfor
+        return dicArtVarCatLists
 
     # enddef
 

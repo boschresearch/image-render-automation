@@ -21,6 +21,9 @@
 ###
 
 import enum
+from typing import Any, TypeAlias, Optional
+
+TCatPathValue: TypeAlias = dict[str, dict[str, Any]]
 
 
 class EViewDimType(enum.Enum):
@@ -107,6 +110,7 @@ class CViewDimGrp(CViewDim):
         _iVarIdx: int,
         _lValues: list[str],
         _lLabels: list[str],
+        _lCategories: list[TCatPathValue],
         _iMin: int,
         _iMax: int,
         _sDimLabel: str = "",
@@ -116,6 +120,7 @@ class CViewDimGrp(CViewDim):
         self._iVarIdx: int = _iVarIdx
         self._lValues: list[str] = _lValues
         self._lLabels: list[str] = _lLabels
+        self._lCategories: list[TCatPathValue] = _lCategories
         self._iCnt = len(self._lValues)
         self._iMin = _iMin
         self._iMax = _iMax
@@ -146,6 +151,24 @@ class CViewDimGrp(CViewDim):
 
     # enddef
 
+    @property
+    def dicCategories(self) -> TCatPathValue:
+        return self._lCategories[self._iIdx]
+
+    # enddef
+
+    def SetCategory(self, _dicPathValue: dict[str, Any], _sCatId: str, *, _iIdx: Optional[int] = None):
+        iIdx = self._iIdx if _iIdx is None else _iIdx
+        if len(_dicPathValue) == 0:
+            if _sCatId in self._lCategories[iIdx]:
+                del self._lCategories[iIdx][_sCatId]
+            # endif
+        else:
+            self._lCategories[iIdx][_sCatId] = _dicPathValue
+        # endif
+
+    # enddef
+
 
 # endclass
 
@@ -159,6 +182,7 @@ class CViewDimArtCommon(CViewDim):
         _lVarIdx: list[int],
         _lValues: list[str],
         _lLabels: list[str],
+        _lCategories: list[TCatPathValue],
         _iMin: int,
         _iMax: int,
         _sDimLabel: str = "",
@@ -169,6 +193,7 @@ class CViewDimArtCommon(CViewDim):
         self._sVarId: str = _sVarId
         self._lValues: list[str] = _lValues
         self._lLabels: list[str] = _lLabels
+        self._lCategories: list[TCatPathValue] = _lCategories
         self._iCnt = len(self._lValues)
         self._iMin = _iMin
         self._iMax = _iMax
@@ -205,6 +230,24 @@ class CViewDimArtCommon(CViewDim):
 
     # enddef
 
+    @property
+    def dicCategories(self) -> TCatPathValue:
+        return self._lCategories[self._iIdx]
+
+    # enddef
+
+    def SetCategory(self, _dicPathValue: dict[str, Any], _sCatId: str, *, _iIdx: Optional[int] = None):
+        iIdx = self._iIdx if _iIdx is None else _iIdx
+        if len(_dicPathValue) == 0:
+            if _sCatId in self._lCategories[iIdx]:
+                del self._lCategories[iIdx][_sCatId]
+            # endif
+        else:
+            self._lCategories[iIdx][_sCatId] = _dicPathValue
+        # endif
+
+    # enddef
+
 
 # endclass
 
@@ -238,6 +281,7 @@ class CViewDimArt(CViewDim):
         _iVarIdx: int,
         _lValues: list[str],
         _lLabels: list[str],
+        _lCategories: list[TCatPathValue],
         _iMin: int,
         _iMax: int,
         _sDimLabel: str = "",
@@ -248,6 +292,7 @@ class CViewDimArt(CViewDim):
         self._sVarId: str = _sVarId
         self._lValues: list[str] = _lValues
         self._lLabels: list[str] = _lLabels
+        self._lCategories: list[TCatPathValue] = _lCategories
         self._iCnt = len(self._lValues)
         self._iMin = _iMin
         self._iMax = _iMax
@@ -281,6 +326,24 @@ class CViewDimArt(CViewDim):
     @property
     def sLabel(self) -> str:
         return self._lLabels[self._iIdx]
+
+    # enddef
+
+    @property
+    def dicCategories(self) -> TCatPathValue:
+        return self._lCategories[self._iIdx]
+
+    # enddef
+
+    def SetCategory(self, _dicPathValue: dict[str, Any], _sCatId: str, *, _iIdx: Optional[int] = None):
+        iIdx = self._iIdx if _iIdx is None else _iIdx
+        if len(_dicPathValue) == 0:
+            if _sCatId in self._lCategories[iIdx]:
+                del self._lCategories[iIdx][_sCatId]
+            # endif
+        else:
+            self._lCategories[iIdx][_sCatId] = _dicPathValue
+        # endif
 
     # enddef
 
