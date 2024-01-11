@@ -192,39 +192,14 @@ class CGroup:
             dicUserVars, f"Error parsing user variable definition of production group '{self._sId}'"
         )
 
-        # print(f"dicUserVars: {dicUserVars}")
+        dicUserSysVars: dict = _dicCfg.get("mSystemVars")
 
+        # Initialize category data collection
         dicCategories: dict = _dicCfg.get("mCategories")
         if dicCategories is not None and not isinstance(dicCategories, dict):
             raise RuntimeError("Categories definition must be a dictionary")
         elif dicCategories is not None:
             self._xCatCln.FromConfigDict(dicCategories)
-        # endif
-
-        sPrjId: str = self._xProject.sId.replace("/", "-")
-        pathCatData: Path = self._xProject.xConfig.pathOutput / f"CategoryData_{sPrjId}_{self._sId}.json"
-        if pathCatData.exists():
-            self._xCatData.FromFile(pathCatData)
-            if self._xCatData.xCatCln != self._xCatCln:
-                # get current date and time as string
-                sDateTime = datetime.now().strftime("%Y-%m-%d_%H-%M-%S")
-                pathOldCatData: Path = (
-                    self._xProject.xConfig.pathOutput / f"CategoryData_{sPrjId}_{self._sId}_{sDateTime}.json"
-                )
-                xOldCatData = self._xCatData
-                xOldCatData.RenameFile(pathOldCatData)
-                self._xCatData = CCategoryData()
-                self._xCatData.Create(
-                    _pathFile=pathCatData, _xCatCln=self._xCatCln, _sProjectId=self._xProject.sId, _sGroupId=self._sId
-                )
-                self._xCatData.CopyCompatibleCategoryDataFrom(xOldCatData)
-                self._xCatData.SaveToFile()
-            # endif
-        else:
-            self._xCatData = CCategoryData()
-            self._xCatData.Create(
-                _pathFile=pathCatData, _xCatCln=self._xCatCln, _sProjectId=self._xProject.sId, _sGroupId=self._sId
-            )
         # endif
 
         self._sName = _dicCfg.get("sName", self._sId)
@@ -234,6 +209,7 @@ class CGroup:
             _xCatCln=self._xCatCln,
             _eLastElementNodeType=ENodeType.PATH,
             _dicSystemVars=self._dicPathSystemVars,
+            _dicUserSysVars=dicUserSysVars,
         )
 
         for sVarId, xPathVar in self._xPathStruct.dicVars.items():
@@ -294,6 +270,7 @@ class CGroup:
                 _xCatCln=self._xCatCln,
                 _eLastElementNodeType=ENodeType.ARTEFACT,
                 _dicSystemVars=self._dicPathSystemVars,
+                _dicUserSysVars=dicUserSysVars,
             )
             xArtType.dicMeta = dicArt.get("mMeta")
             self._dicArtTypes[sArtId] = xArtType
@@ -309,6 +286,39 @@ class CGroup:
             # endfor
 
         # endfor
+
+        # Meta data for category data collection
+        dicMeta = {
+            "sProjectId": self._xProject.sId,
+            "sGroupId": self._sId,
+            "sGroupName": self._sName,
+            "lGroupPathStructure": self._xPathStruct.lPathVarIds,
+            "mArtefactPathStructures": {
+                sArtId: xArtType.xPathStruct.lPathVarIds for sArtId, xArtType in self._dicArtTypes.items()
+            },
+        }
+
+        sPrjId: str = self._xProject.sId.replace("/", "-")
+        pathCatData: Path = self._xProject.xConfig.pathOutput / f"CategoryData_{sPrjId}_{self._sId}.json"
+        if pathCatData.exists():
+            self._xCatData.FromFile(pathCatData)
+            if self._xCatData.xCatCln != self._xCatCln:
+                # get current date and time as string
+                sDateTime = datetime.now().strftime("%Y-%m-%d_%H-%M-%S")
+                pathOldCatData: Path = (
+                    self._xProject.xConfig.pathOutput / f"CategoryData_{sPrjId}_{self._sId}_{sDateTime}.json"
+                )
+                xOldCatData = self._xCatData
+                xOldCatData.RenameFile(pathOldCatData)
+                self._xCatData = CCategoryData()
+                self._xCatData.Create(_pathFile=pathCatData, _xCatCln=self._xCatCln, _dicMeta=dicMeta)
+                self._xCatData.CopyCompatibleCategoryDataFrom(xOldCatData)
+                self._xCatData.SaveToFile()
+            # endif
+        else:
+            self._xCatData = CCategoryData()
+            self._xCatData.Create(_pathFile=pathCatData, _xCatCln=self._xCatCln, _dicMeta=dicMeta)
+        # endif
 
     # enddef
 

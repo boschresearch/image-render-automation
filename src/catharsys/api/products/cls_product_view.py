@@ -719,7 +719,18 @@ class CProductView:
         _sArtTypeId: Optional[str] = None,
     ):
         sDimId, eDimType = self.GetDimIdType(_sDimKey)
-        sDimLabel = self._dicViewDimNames.get(_sDimKey, "")
+        sDimLabel = self._dicViewDimNames.get(_sDimKey)
+
+        if sDimLabel is None:
+            if _sArtTypeId is not None:
+                dicDimNames = self._dicArtViewDimNames.get(_sArtTypeId)
+                if dicDimNames is not None:
+                    sDimLabel = dicDimNames.get(_sDimKey)
+                # endif
+            else:
+                sDimLabel = ""
+            # endif
+        # endif
 
         bRangeValid: bool = _iRangeMin is not None and _iRangeMax is not None
         iMin: int = _iRangeMin

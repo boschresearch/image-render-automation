@@ -23,6 +23,7 @@
 import re
 from pathlib import Path
 from typing import Callable, Optional, Iterator, Any
+import dataclasses
 from dataclasses import dataclass
 import enum
 
@@ -75,6 +76,7 @@ class CPathStructure:
         _xCatCln: Optional[CCategoryCollection] = None,
         _dicUserVars: Optional[dict] = None,
         _dicSystemVars: Optional[dict[str, CPathVar]] = None,
+        _dicUserSysVars: Optional[dict] = None,
     ):
         self._sPathStruct: str = _sPathStruct
         self._eLastElementNodeType: ENodeType = _eLastElementNodeType
@@ -92,7 +94,7 @@ class CPathStructure:
         # if _dicSystemVars is not None:
         #     self._dicSystemVars = copy.deepcopy(_dicSystemVars)
         # # endif
-        self._ParsePathStruct(_dicUserVars)
+        self._ParsePathStruct(_dicUserVars, _dicUserSysVars)
 
     # enddef
 
@@ -120,7 +122,11 @@ class CPathStructure:
 
     # enddef
 
-    def _ParsePathStruct(self, _dicUserVars: Optional[dict] = None):
+    def _ParsePathStruct(
+        self,
+        _dicUserVars: Optional[dict] = None,
+        _dicUserSysVars: Optional[dict] = None,
+    ):
         lItems: list[str] = self._sPathStruct.split("/")
         for iIdx, sItem in enumerate(lItems):
             bIsLastElement: bool = iIdx == len(lItems) - 1
@@ -130,9 +136,26 @@ class CPathStructure:
             if sItem.startswith("!"):
                 sVarId = sItem[1:]
                 if sVarId not in self._dicSystemVars:
-                    raise RuntimeError(f"Unknown pre-defined path structure variable '{sVarId}'")
+                    raise RuntimeError(f"Unknown catharsys-defined path structure variable '{sVarId}'")
                 # endif
-                self._dicVars[sVarId] = self._dicSystemVars[sVarId]
+                xSysVar: CPathVar = self._dicSystemVars[sVarId]
+                if _dicUserSysVars is not None and sVarId in _dicUserSysVars:
+                    dicSysVar = _dicUserSysVars[sVarId]
+                    lCat: list[CCategory] = []
+                    lSysVarCats: list[str] = dicSysVar.get("lCategories", [])
+                    for sCatKey in lSysVarCats:
+                        xCat = self._xCatCln.Get(sCatKey)
+                        if xCat is None:
+                            raise RuntimeError(
+                                f"Category '{sCatKey}' specified in system variable '{sVarId}' is not defined"
+                            )
+                        # endif
+                        lCat.append(xCat)
+                    # endfor
+
+                    xSysVar = dataclasses.replace(xSysVar, lCategories=lCat)
+                # endif
+                self._dicVars[sVarId] = xSysVar
 
             elif sItem.startswith("?"):
                 sVarId = sItem[1:]
@@ -224,11 +247,19 @@ class CPathStructure:
                     continue
                 # endif
 
-                if reValue is not None and reValue.fullmatch(pathItem.name) is None:
-                    continue
+                sName = pathItem.name
+                sPathName = pathItem.name
+                if reValue is not None:
+                    xMatch = reValue.fullmatch(pathItem.name)
+                    if xMatch is None:
+                        continue
+                    # endif
+                    sName = xMatch.group(1)
                 # endif
 
-                nodeX = CNode(pathItem.name, parent=_nodeParent, _iLevel=_iLevel, _eType=xPathVar.eNodeType)
+                nodeX = CNode(
+                    sName, parent=_nodeParent, _iLevel=_iLevel, _eType=xPathVar.eNodeType, _sPathName=sPathName
+                )
                 if xPathVar.eNodeType == ENodeType.PATH and len(lPathVarIds) > _iLevel + 1:
                     self.ScanFileSystem(
                         _pathScan=pathItem,

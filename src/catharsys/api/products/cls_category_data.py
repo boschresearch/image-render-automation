@@ -65,8 +65,7 @@ class CCategoryData:
         *,
         _pathFile: Path,
         _xCatCln: CCategoryCollection,
-        _sProjectId: str,
-        _sGroupId: str,
+        _dicMeta: dict,
         _bReplace: bool = False,
     ):
         """Create a new category data file. The file must not exist. If it exists, it can be replaced
@@ -92,8 +91,7 @@ class CCategoryData:
         self._xCatCln = _xCatCln
         self._dicConfig = {
             "sDTI": "/catharsys/production/category-data:1.0",
-            "sProjectId": _sProjectId,
-            "sGroupId": _sGroupId,
+            "mMeta": _dicMeta,
             "mCategories": self._xCatCln.ToDict(),
             "mData": self._dicVarValCatPath,
         }
