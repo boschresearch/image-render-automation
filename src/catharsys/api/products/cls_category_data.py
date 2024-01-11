@@ -22,14 +22,25 @@
 
 import enum
 from pathlib import Path
-from typing import Union, Any
+from typing import Union, Any, TypeAlias
 from anybase import config
 from .cls_category_collection import CCategoryCollection
+
+# TODO: Changed type of dicVarValCat from dict[str, dict[str, dict[str, Any]]] to dict[str, dict[str, dict[str, dict[str, Any]]]]]
+#       the last dictionary has to map the node path to the category value.
+#       This is necessary because the same variable value can occur in different node paths.
+#       To set a category value, the node path must be specified, in addition to the variable id and its' value.
+#       However, currently the node path is not readily availabe, when the category GUI elements are created.
+#       Need to write a function in CProductView, similar to GetViewDimNodeIterationValue(), which returns the node path.
+#       This has to work also for partial node paths, i.e. when the node path is not fully specified all the way down to the artefact.
+#       The partial node path id should be a string concatenation of the node labels, separated by a '|' character.
+
+TVarValCatPath: TypeAlias = dict[str, dict[str, dict[str, dict[str, Any]]]]
 
 
 class CCategoryData:
     def __init__(self):
-        self._dicVarValCat: dict[str, dict[str, dict[str, Any]]] = dict()
+        self._dicVarValCatPath: TVarValCatPath = dict()
         self._xCatCln: CCategoryCollection = CCategoryCollection()
         self._pathFile: Path = None
         self._dicConfig: dict = None
@@ -37,8 +48,8 @@ class CCategoryData:
     # enddef
 
     @property
-    def dicVarValCat(self) -> dict[str, dict[str, dict[str, Any]]]:
-        return self._dicVarValCat
+    def dicVarValCatPath(self) -> TVarValCatPath:
+        return self._dicVarValCatPath
 
     # enddef
 
@@ -49,7 +60,14 @@ class CCategoryData:
     # enddef
 
     # ##################################################################################################
-    def Create(self, *, _pathFile: Path, _xCatCln: CCategoryCollection, _bReplace: bool = False):
+    def Create(
+        self,
+        *,
+        _pathFile: Path,
+        _xCatCln: CCategoryCollection,
+        _dicMeta: dict,
+        _bReplace: bool = False,
+    ):
         """Create a new category data file. The file must not exist. If it exists, it can be replaced
         by setting the _bReplace parameter to True.
 
@@ -68,13 +86,14 @@ class CCategoryData:
             _pathFile.unlink()
         # endif
 
-        self._dicVarValCat.clear()
+        self._dicVarValCatPath.clear()
         self._pathFile = _pathFile
         self._xCatCln = _xCatCln
         self._dicConfig = {
             "sDTI": "/catharsys/production/category-data:1.0",
+            "mMeta": _dicMeta,
             "mCategories": self._xCatCln.ToDict(),
-            "mData": self._dicVarValCat,
+            "mData": self._dicVarValCatPath,
         }
 
     # endif
@@ -99,17 +118,20 @@ class CCategoryData:
         # endfor
 
         # copy the compatible categories
-        for sVarId, dicValCat in _xCatData._dicVarValCat.items():
-            for sValName, dicCat in dicValCat.items():
+        for sVarId, dicValCatPath in _xCatData._dicVarValCatPath.items():
+            for sValName, dicCatPath in dicValCatPath.items():
                 for sCatId in lCompatibleCatIds:
-                    if sCatId in dicCat:
-                        self.SetValue(
-                            _sVarId=sVarId,
-                            _sVarValue=sValName,
-                            _sCatId=sCatId,
-                            _xCatValue=dicCat[sCatId],
-                            _bDoSave=False,
-                        )
+                    if sCatId in dicCatPath:
+                        for sPath, xCatValue in dicCatPath[sCatId].items():
+                            self.SetValue(
+                                _sVarId=sVarId,
+                                _sVarValue=sValName,
+                                _sCatId=sCatId,
+                                _sPath=sPath,
+                                _xCatValue=xCatValue,
+                                _bDoSave=False,
+                            )
+                        # endfor
                     # endif
                 # endfor
             # endfor
@@ -138,9 +160,9 @@ class CCategoryData:
 
         dicData = self._dicConfig.get("mData")
         if not isinstance(dicData, dict):
-            self._dicVarValCat.clear()
+            self._dicVarValCatPath.clear()
         else:
-            self._dicVarValCat = dicData
+            self._dicVarValCatPath = dicData
         # endif
 
         dicCats: dict = self._dicConfig.get("mCategories")
@@ -159,14 +181,15 @@ class CCategoryData:
         _sVarId: str,
         _sVarValue: str,
         _sCatId: str,
+        _xCatPath: "CViewDimNodePath",
         _xCatValue: Any,
         _bDoSave: bool = True,
-    ):
+    ) -> dict[str, Any]:
         xCat = self._xCatCln.Get(_sCatId)
         if xCat is None:
             raise RuntimeError(
                 f"Category '{_sCatId}' not defined. "
-                "Trying to set variable '{_sVarId}' for value '{_sVarValue}' with value '{_xCatValue}'"
+                "Trying to set variable '{_sVarId}' for value '{_sVarValue}' at path '{_sPath}' with value '{_xCatValue}'"
             )
         # endif
 
@@ -175,44 +198,50 @@ class CCategoryData:
         # is set to the default value.
         bIsDefaultValue: bool = _xCatValue == xCat.GetDefaultValue()
 
-        dicValCat = self._dicVarValCat.get(_sVarId)
-        if dicValCat is None:
+        dicValCatPath = self._dicVarValCatPath.get(_sVarId)
+        if dicValCatPath is None:
             if bIsDefaultValue is True:
                 return
             # endif
-            self._dicVarValCat[_sVarId] = dict()
-            dicValCat = self._dicVarValCat[_sVarId]
+            self._dicVarValCatPath[_sVarId] = dict()
+            dicValCatPath = self._dicVarValCatPath[_sVarId]
         # endif
 
-        dicCat = dicValCat.get(_sVarValue)
-        if dicCat is None:
+        dicCatPath = dicValCatPath.get(_sVarValue)
+        if dicCatPath is None:
             if bIsDefaultValue is True:
                 return
             # endif
-            dicValCat[_sVarValue] = dict()
-            dicCat = dicValCat[_sVarValue]
+            dicValCatPath[_sVarValue] = dict()
+            dicCatPath = dicValCatPath[_sVarValue]
         # endif
 
-        if _sCatId not in dicCat and bIsDefaultValue is True:
-            return
+        dicPath = dicCatPath.get(_sCatId)
+        if dicPath is None:
+            if bIsDefaultValue is True:
+                return
+            # endif
+            dicCatPath[_sCatId] = dict()
+            dicPath = dicCatPath[_sCatId]
         # endif
 
-        if _sCatId in dicCat and bIsDefaultValue is True:
-            del dicCat[_sCatId]
-        else:
-            dicCat[_sCatId] = _xCatValue
-        # endif
+        _xCatPath.SetInPathDict(dicPath, _xCatValue, _xDefault=xCat.GetDefaultValue())
 
-        if len(dicCat) == 0:
-            del dicValCat[_sVarValue]
-            if len(dicValCat) == 0:
-                del self._dicVarValCat[_sVarId]
+        if len(dicPath) == 0:
+            del dicCatPath[_sCatId]
+            if len(dicCatPath) == 0:
+                del dicValCatPath[_sVarValue]
+                if len(dicValCatPath) == 0:
+                    del self._dicVarValCatPath[_sVarId]
+                # endif
             # endif
         # endif
 
         if _bDoSave is True:
             self.SaveToFile()
         # endif
+
+        return dicPath
 
     # enddef
 
@@ -223,7 +252,7 @@ class CCategoryData:
         # endif
 
         if "mData" not in self._dicConfig:
-            self._dicConfig["mData"] = self._dicVarValCat
+            self._dicConfig["mData"] = self._dicVarValCatPath
         # endif
 
         config.Save(self._pathFile, self._dicConfig)

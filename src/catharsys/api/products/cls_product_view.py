@@ -23,7 +23,7 @@
 import copy
 from collections.abc import Iterable
 from pathlib import Path
-from typing import Optional, Callable, Union, Any
+from typing import Optional, Callable, Union, Any, TypeAlias
 
 from catharsys.api.products.cls_products import CProducts
 from catharsys.api.products.cls_group import CGroup, CArtefactType
@@ -33,6 +33,8 @@ from catharsys.api.products.cls_category import CCategory
 
 from .cls_view_dim import CViewDim, CViewDimArtCommon, CViewDimArt, CViewDimArtType, CViewDimGrp, EViewDimType
 from .cls_view_dim_node import CViewDimNode
+
+TCatPathValue: TypeAlias = dict[str, dict[str, Any]]
 
 
 # ##################################################################################################################
@@ -44,14 +46,15 @@ class CProductView:
 
         self._lGrpVarValueLists: list[list[str]] = None
         self._lGrpVarLabelLists: list[list[str]] = None
-        self._lGrpVarCategoryLists: list[list[dict[str, Any]]] = None
+        self._lGrpVarCategoryLists: list[list[TCatPathValue]] = None
 
         self._lSelGrpVarValueLists: list[list[str]] = None
         self._lSelGrpVarLabelLists: list[list[str]] = None
-        self._lSelGrpVarCategoryLists: list[list[dict[str, Any]]] = None
+        self._lSelGrpVarCategoryLists: list[list[TCatPathValue]] = None
 
         self._dicArtVarValueLists: dict[str, list[list[str]]] = None
         self._dicArtVarTypeLists: dict[str, list[str]] = None
+        self._dicArtVarCategoryLists: dict[str, list[list[TCatPathValue]]] = None
 
         # dictionary of variable ids of selected artefact types
         self._dicSelArtTypeVarIds: dict[str, list[str]] = None
@@ -127,6 +130,12 @@ class CProductView:
     @property
     def xGrpPathStruct(self) -> CPathStructure:
         return self._xProdGrp.xPathStruct
+
+    # enddef
+
+    @property
+    def dicArtTypes(self) -> dict[str, CArtefactType]:
+        return self._xProdGrp.dicArtTypes
 
     # enddef
 
@@ -250,17 +259,30 @@ class CProductView:
         *,
         _sVarId: str,
         _sVarValue: str,
+        _xCatPath: "CViewDimNodePath",
         _sCatId: str,
         _xCatValue: Any,
+        _xViewDim: CViewDim,
+        _iViewDimIdx: int,
         _bDoSave: bool = True,
     ):
-        self._xProdGrp.SetVarCategoryValue(
+        dicPathValue = self._xProdGrp.SetVarCategoryValue(
             _sVarId=_sVarId,
             _sVarValue=_sVarValue,
+            _xCatPath=_xCatPath,
             _sCatId=_sCatId,
             _xCatValue=_xCatValue,
             _bDoSave=_bDoSave,
         )
+
+        self.SetViewDimCategory(_xViewDim, _iViewDimIdx, _sCatId, dicPathValue)
+
+        # print(f"_sVarId: {_sVarId}")
+        # print(f"_sVarValue: {_sVarValue}")
+        # print(f"_sCatId: {_sCatId}")
+        # print(f"_xCatValue: {_xCatValue}")
+        # print(f"dicPathValue: {dicPathValue}")
+        # print(f"self._lSelGrpVarCategoryLists: {self._lSelGrpVarCategoryLists}")
 
     # enddef
 
@@ -429,13 +451,13 @@ class CProductView:
         self,
         _lSelVarValueLists: list[list[str]],
         _lVarValueLists: list[list[str]],
-        _lVarValCatLists: list[list[dict[str, Any]]],
+        _lVarValCatLists: list[list[TCatPathValue]],
     ):
         # Get list of labels for selected group values
-        lSelVarValCatLists: list[list[dict[str, Any]]] = []
+        lSelVarValCatLists: list[list[TCatPathValue]] = []
 
         for lSelVarValues, lVarValues, lValCatLists in zip(_lSelVarValueLists, _lVarValueLists, _lVarValCatLists):
-            lSelValCatLists: list[dict[str, Any]] = []
+            lSelValCatLists: list[TCatPathValue] = []
             for sSelValue in lSelVarValues:
                 try:
                     iIdx = lVarValues.index(sSelValue)
@@ -541,6 +563,7 @@ class CProductView:
             _lSelArtVarValueLists, self._dicArtVarValueLists[_sArtTypeId], self._dicArtVarCategoryLists[_sArtTypeId]
         )
 
+        # print(f"self._dicArtVarCategoryLists: {self._dicArtVarCategoryLists}")
         # print(f"self._dicSelArtVarCategoryLists: {self._dicSelArtVarCategoryLists}")
 
         # List of artefact variable ids where more than one value is selected.
@@ -696,7 +719,18 @@ class CProductView:
         _sArtTypeId: Optional[str] = None,
     ):
         sDimId, eDimType = self.GetDimIdType(_sDimKey)
-        sDimLabel = self._dicViewDimNames.get(_sDimKey, "")
+        sDimLabel = self._dicViewDimNames.get(_sDimKey)
+
+        if sDimLabel is None:
+            if _sArtTypeId is not None:
+                dicDimNames = self._dicArtViewDimNames.get(_sArtTypeId)
+                if dicDimNames is not None:
+                    sDimLabel = dicDimNames.get(_sDimKey)
+                # endif
+            else:
+                sDimLabel = ""
+            # endif
+        # endif
 
         bRangeValid: bool = _iRangeMin is not None and _iRangeMax is not None
         iMin: int = _iRangeMin
@@ -839,6 +873,7 @@ class CProductView:
 
     # enddef
 
+    # ####################################################################################################################
     # ####################################################################################################################
     def GetViewDimNodeIterationValue(self) -> tuple[CNode, CArtefactType]:
         xViewDim: CViewDim = None
@@ -1013,8 +1048,8 @@ class CProductView:
     # enddef
 
     # ##########################################################################################################
-    def GetViewDimCategories(self, _xViewDim: CViewDim) -> dict[str, Any]:
-        dicValue: dict[str, Any] = None
+    def GetViewDimCategories(self, _xViewDim: CViewDim) -> TCatPathValue:
+        dicValue: TCatPathValue = None
 
         if isinstance(_xViewDim, CViewDimGrp):
             xVdg: CViewDimGrp = _xViewDim
@@ -1036,6 +1071,31 @@ class CProductView:
         # endif
 
         return dicValue
+
+    # enddef
+
+    # ##########################################################################################################
+    def SetViewDimCategory(
+        self, _xViewDim: CViewDim, _iViewDimIdx: int, _sCatId: str, _dicPathValue: dict[str, Any]
+    ) -> None:
+        if isinstance(_xViewDim, CViewDimGrp):
+            xVdg: CViewDimGrp = _xViewDim
+            xVdg.SetCategory(_dicPathValue, _sCatId, _iIdx=_iViewDimIdx)
+
+        elif isinstance(_xViewDim, CViewDimArtType):
+            pass
+
+        elif isinstance(_xViewDim, CViewDimArtCommon):
+            xVdac: CViewDimArtCommon = _xViewDim
+            xVdac.SetCategory(_dicPathValue, _sCatId, _iIdx=_iViewDimIdx)
+
+        elif isinstance(_xViewDim, CViewDimArt):
+            xVda: CViewDimArt = _xViewDim
+            xVda.SetCategory(_dicPathValue, _sCatId, _iIdx=_iViewDimIdx)
+
+        else:
+            raise RuntimeError(f"Invalid view dimension object type: {_xViewDim._eType}")
+        # endif
 
     # enddef
 
