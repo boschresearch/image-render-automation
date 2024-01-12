@@ -134,6 +134,12 @@ class CProductView:
     # enddef
 
     @property
+    def lCommonArtVarIds(self) -> list[str]:
+        return self._xProdGrp.lCommonArtVarIds
+
+    # enddef
+
+    @property
     def dicArtTypes(self) -> dict[str, CArtefactType]:
         return self._xProdGrp.dicArtTypes
 

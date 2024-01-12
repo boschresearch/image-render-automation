@@ -87,6 +87,7 @@ class CGroup:
         # endf
 
         self._dicVarValues: dict[str, str] = dict()
+        self._lCommonArtVarIds: list[str] = []
 
     # enddef
 
@@ -132,6 +133,12 @@ class CGroup:
     @property
     def dicVarValues(self) -> dict[str, str]:
         return self._dicVarValues
+
+    # enddef
+
+    @property
+    def lCommonArtVarIds(self) -> list[str]:
+        return self._lCommonArtVarIds
 
     # enddef
 
@@ -235,6 +242,8 @@ class CGroup:
             )
         # endif
 
+        dicArtVarsTypeList: dict[str, list[str]] = dict()
+
         for sArtId in dicArtefacts:
             if sArtId.startswith("__"):
                 continue
@@ -275,6 +284,15 @@ class CGroup:
             xArtType.dicMeta = dicArt.get("mMeta")
             self._dicArtTypes[sArtId] = xArtType
 
+            for sArtVarId in xArtType.xPathStruct.lPathVarIds:
+                lArtTypes: list[str] = dicArtVarsTypeList.get(sArtVarId)
+                if lArtTypes is None:
+                    dicArtVarsTypeList[sArtVarId] = [xArtType.sId]
+                else:
+                    lArtTypes.append(xArtType.sId)
+                # endif
+            # endfor
+
             for sVarId, xPathVar in xArtType.xPathStruct.dicVars.items():
                 if sVarId.startswith("__"):
                     continue
@@ -287,6 +305,12 @@ class CGroup:
 
         # endfor
 
+        # List of artefact variable ids that are common over all artefact types
+        self._lCommonArtVarIds = [sVarId for sVarId, lArtTypes in dicArtVarsTypeList.items() if len(lArtTypes) > 1]
+
+        # sort the common artefact variable ids by their name
+        self._lCommonArtVarIds.sort()
+
         # Meta data for category data collection
         dicMeta = {
             "sProjectId": self._xProject.sId,
@@ -296,6 +320,7 @@ class CGroup:
             "mArtefactPathStructures": {
                 sArtId: xArtType.xPathStruct.lPathVarIds for sArtId, xArtType in self._dicArtTypes.items()
             },
+            "lCommonArtefactVarIds": self._lCommonArtVarIds,
         }
 
         sPrjId: str = self._xProject.sId.replace("/", "-")
