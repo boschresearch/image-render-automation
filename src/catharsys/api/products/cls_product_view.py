@@ -55,7 +55,6 @@ class CProductView:
         self._dicArtVarValueLists: dict[str, list[list[str]]] = None
         self._dicArtVarTypeLists: dict[str, list[str]] = None
         self._dicArtVarCategoryLists: dict[str, list[list[TCatPathValue]]] = None
-        self._lCommonArtVarIds: list[str] = None
 
         # dictionary of variable ids of selected artefact types
         self._dicSelArtTypeVarIds: dict[str, list[str]] = None
@@ -136,7 +135,7 @@ class CProductView:
 
     @property
     def lCommonArtVarIds(self) -> list[str]:
-        return self._lCommonArtVarIds
+        return self._xProdGrp.lCommonArtVarIds
 
     # enddef
 
@@ -503,15 +502,6 @@ class CProductView:
         self._dicArtVarValueLists, self._dicArtVarTypeLists = self._xProdGrp.GetArtefactVarValues(_lSelGrpVarValueLists)
         self._dicArtVarLabelLists = self._xProdGrp.GetArtefactVarLabels(self._dicArtVarValueLists)
         self._dicArtVarCategoryLists = self._xProdGrp.GetArtefactVarCategories(self._dicArtVarValueLists)
-
-        # List of artefact variable ids that are common over all artefact types
-        self._lCommonArtVarIds = [
-            sVarId for sVarId, lArtTypes in self._dicArtVarTypeLists.items() if len(lArtTypes) > 1
-        ]
-
-        # sort the common artefact variable ids by their name
-        self._lCommonArtVarIds.sort()
-        # print(f"self._lCommonArtVarIds: {self._lCommonArtVarIds}")
 
         # List of group variable ids where more than one value is selected.
         # These are the variables that we can iterate over.

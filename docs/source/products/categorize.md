@@ -171,3 +171,98 @@ A Catharsys action or other custom processing may result in per-frame artefacts 
 
 ## Storage Format
 
+The data is stored in a JSON file in the `_output` folder of the workspace. The filename has the structure `CategoryData_[configuration id]_[group id].json`. It contains the category definitions used as well as additional meta data. The important parts of the meta data are the lists of the group path, the artefact and the common artefact variable ids. These are important to intepret the paths used for storing the category values.
+
+Here is an example of the meta data block:
+
+```json
+    "mMeta": {
+        "sProjectId": "usecase/generative",
+        "sGroupId": "std",
+        "sGroupName": "Generative",
+        "lGroupPathStructure": [
+            "production",
+            "rq",
+            "project",
+            "idx"
+        ],
+        "mArtefactPathStructures": {
+            "image": [
+                "Image",
+                "frame"
+            ],
+            "depth": [
+                "AT_Depth",
+                "depth",
+                "Preview",
+                "frame"
+            ],
+            "gen": [
+                "Takuma-Diffusers",
+                "pidx",
+                "dwidx",
+                "frame"
+            ]
+        },
+        "lCommonArtefactVarIds": [
+            "frame"
+        ]
+    },
+```
+
+The data itself is stored in the `mData` block. Here is an example, which will be discussed below:
+
+```json
+    "mData": {
+        "frame": {
+            "0": {
+                "quality": {
+                    "*|*|*|1&image&*|*": 2,
+                    "*|*|*|*&*&*": 0
+                }
+            },
+            "1": {
+                "quality": {
+                    "*|*|*|1&image&*|*": 2,
+                    "*|*|*|1&depth&*|*|*|*": 2
+                }
+            }
+        },
+        "idx": {
+            "1": {
+                "quality": {
+                    "*|*|*|*&image&*|0": 0,
+                    "*|*|*|*&*&*": 0
+                }
+            }
+        }
+    }
+```
+
+The data dictionary has the following levels:
+
+   - The first level is a dictionary with the **variable id** as key and a dictionary as value.
+   - The second level is a dictionary with the **variable value** as key and a dictionary as value.
+   - The third level is a dictionary with the **category id** as key and a dictionary as value.
+   - The fourth level is a dictionary with the **path** as key and the **category value** as value.
+
+Depending on the order in which the user displays the various variable dimensions, setting a category value is stored under a different path. For example, if the frame is displayed as top level element, then the artefact type and then the configuration index (`idx`), selecting a category for a configuration index is meant for just a specific frame and not all frames. If, however, the configuration index were the top element, then categorizing it is intended for all frames.
+
+These differences are stored in the paths as follows:
+    - The path has three parts, separated by `&`: `[group path]&[artefact id]&[artefact path]`.
+    - The elements of the group path and the artefact path are separated by the `|` symbol.
+    - The variable ids the group path values refer to are given in the `lGroupPathStructure` element.
+    - The variable ids the artefact path values refer to are given in the `mArtefactPathStructures` element depending on the artefact id.
+    - If the artefact id is `*` then the artefact path elements refer to the `lCommonArtefactVarIds` element.
+
+**Important**: The default values for a category are not stored explicitly. The only case where a category default value is explicitly stored, is if a more general path is set to a different value.
+
+Consider the first path for `frame -> 0 -> quality`, which is `*|*|*|1&image&*|*` and set to value 2. This means that artefact `image` for configuration `1` and frame `0` has quality value 2. 
+
+The second path `*|*|*|*&*&*` is more general, as it refers to all configurations. Therefore, frame `0` has quality value 0 for all artefacts and configurations, unless it is overwritten by a more specific path.
+
+:::{note}
+To process these paths and test for containment etc., you can use the class `catharsys.api.products.cls_view_dim_node_path.CViewDimNodePath` ([file](https://github.com/boschresearch/image-render-automation/blob/main/src/catharsys/api/products/cls_view_dim_node_path.py))
+:::
+
+

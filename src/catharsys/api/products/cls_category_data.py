@@ -26,15 +26,12 @@ from typing import Union, Any, TypeAlias
 from anybase import config
 from .cls_category_collection import CCategoryCollection
 
-# TODO: Changed type of dicVarValCat from dict[str, dict[str, dict[str, Any]]] to dict[str, dict[str, dict[str, dict[str, Any]]]]]
-#       the last dictionary has to map the node path to the category value.
-#       This is necessary because the same variable value can occur in different node paths.
-#       To set a category value, the node path must be specified, in addition to the variable id and its' value.
-#       However, currently the node path is not readily availabe, when the category GUI elements are created.
-#       Need to write a function in CProductView, similar to GetViewDimNodeIterationValue(), which returns the node path.
-#       This has to work also for partial node paths, i.e. when the node path is not fully specified all the way down to the artefact.
-#       The partial node path id should be a string concatenation of the node labels, separated by a '|' character.
-
+# This type alias is used to define the structure of the category data dictionary.
+# The dictionary is structured as follows:
+#   - The first level is a dictionary with the variable id as key and a dictionary as value.
+#   - The second level is a dictionary with the variable value as key and a dictionary as value.
+#   - The third level is a dictionary with the category id as key and a dictionary as value.
+#   - The fourth level is a dictionary with the path as key and the category value as value.
 TVarValCatPath: TypeAlias = dict[str, dict[str, dict[str, dict[str, Any]]]]
 
 
@@ -185,6 +182,27 @@ class CCategoryData:
         _xCatValue: Any,
         _bDoSave: bool = True,
     ) -> dict[str, Any]:
+        """Set a value for a category.
+        Parameters
+        ----------
+        _sVarId : str
+            The variable id.
+        _sVarValue : str
+            The variable value.
+        _sCatId : str
+            The category id.
+        _xCatPath : CViewDimNodePath
+            The path to the category value.
+        _xCatValue : Any
+            The category value.
+        _bDoSave : bool, optional
+            If True, the category data will be saved to the file. The default is True.
+
+        Returns
+        -------
+        dict[str, Any]
+            A dictionary with the category values for all paths set for this category.
+        """
         xCat = self._xCatCln.Get(_sCatId)
         if xCat is None:
             raise RuntimeError(

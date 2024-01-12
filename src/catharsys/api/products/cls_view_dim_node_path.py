@@ -42,7 +42,7 @@ class CViewDimNodePath:
         elif isinstance(_xData, CViewDimNode):
             self._FromViewDimNode(_xData, _iParent=_iParent)
         else:
-            raise TypeError(f"Invalid type for CViewDimNodePath: {type(_xData)}")
+            raise TypeError(f"Invalid type for _xData: {type(_xData)}")
         # endif
 
     # enddef
@@ -224,8 +224,7 @@ class CViewDimNodePath:
             for xVac in lComViewDims:
                 iVarIdx = xProdView.lCommonArtVarIds.index(xVac.sVarId)
                 self._lArtPath[iVarIdx] = xVac.sValue
-        # endfor
-
+            # endfor
         # endif
 
         if len(self._lArtPath) > 0:
@@ -236,6 +235,16 @@ class CViewDimNodePath:
 
     # ####################################################################################################################
     def GetFromPathDict(self, _dicPath: dict[str, Any], _xDefault: Optional[Any] = None) -> Optional[Any]:
+        """Returns the data for the most specific path in the dictionary that contains this path,
+        or the default value if there is no such path.
+
+        Parameters:
+        _dicPath: The dictionary with the paths as keys and the data as values.
+        _xDefault: The default value to return if there is no path in the dictionary that contains this path.
+
+        Returns:
+        The data for the most specific path in the dictionary that contains this path, or the default value if there is no such path.
+        """
         xResult: Optional[Any] = _xDefault
         iSpecMax: int = -1
 
