@@ -252,7 +252,9 @@ class CLoopConfigs:
     @logFunctionCall
     def GetData(self, _xCML: CConfigCML = None):  # dicCfgVars={}, *, dicRuntimeVars=None, setRuntimeVarsEval=None):
         if self.iTotalIdx < 0 or self.iTotalIdx >= self.iTotalCnt:
-            raise Exception("Loop index ({0}) out of range.".format(self.iTotalIdx))
+            raise Exception(
+                f"Configuration index '{self.iTotalIdx}' is out of range for a total of '{self.iTotalCnt}' configurations."
+            )
         # endif
 
         # dicVars = copy.deepcopy(dicCfgVars)
