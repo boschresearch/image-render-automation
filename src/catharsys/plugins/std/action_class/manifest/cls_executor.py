@@ -279,6 +279,10 @@ class CActionClassManifestExecutor(CActionClassExecutor):
             lScheme=self.lTrialCfgs,
         )
         iCfgCnt = xLoopConfigs.GetTotalStepCount()
+        if iCfgCnt == 0:
+            raise RuntimeError("No configurations available to execute")
+        # endif
+
         # dTimeEnd = time.perf_counter()
         # print("Init Job config and count total number: {:5.2f}s".format(dTimeEnd - dTimeStart))
 

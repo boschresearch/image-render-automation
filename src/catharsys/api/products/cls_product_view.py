@@ -388,9 +388,11 @@ class CProductView:
         _sGroupId: Optional[str] = None,
         _funcStatus: Optional[Callable[[str], None]] = None,
         _funcIterInit: Optional[Callable[[str, int], None]] = None,
-        _funcIterUpdate: Optional[Callable[[int], None]] = None,
+        _funcIterUpdate: Optional[Callable[[int, bool], None]] = None,
     ):
-        self._xProdData.ScanArtefacts(_sGroupId=_sGroupId)
+        self._xProdData.ScanArtefacts(
+            _sGroupId=_sGroupId, _funcStatus=_funcStatus, _funcIterInit=_funcIterInit, _funcIterUpdate=_funcIterUpdate
+        )
 
     # enddef
 

@@ -208,8 +208,10 @@ class CProducts:
         _sGroupId: Optional[str] = None,
         _funcStatus: Optional[Callable[[str], None]] = None,
         _funcIterInit: Optional[Callable[[str, int], None]] = None,
-        _funcIterUpdate: Optional[Callable[[int], None]] = None,
+        _funcIterUpdate: Optional[Callable[[int, bool], None]] = None,
     ):
+        # print(f"Scanning for production group '{_sGroupId}'...")
+
         if _sGroupId is None:
             for sGroup in self._dicGroups:
                 if sGroup.startswith("__"):
@@ -217,7 +219,7 @@ class CProducts:
                 # endif
 
                 if _funcStatus is not None:
-                    _funcStatus(f"Scanning for production group '{sGroup}'...")
+                    _funcStatus(f"Scanning for production group '{_sGroupId}'...")
                 # endif
 
                 self._dicGroups[sGroup].ScanArtefacts(
