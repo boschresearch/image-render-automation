@@ -38,8 +38,9 @@ The automation system for action execution
    products/analyze
    products/categorize
    license
+   back-to-main
 
-`main <../../html/index.html>`__
+.. `Go back to main page... <../../html/index.html>`__
 
 
 .. Indices and tables
