@@ -381,23 +381,82 @@ The element `lSettings` is optional anc contains a list of setting type dictiona
 
 - Render settings for the Blender variables in `bpy.context.scene.render` use the DTI `/catharsys/blender/render/settings/render:1`
 - Cycles settings for the Blender variables in `bpy.context.scene.cycles` use the DTI `/catharsys/blender/render/settings/cycles:1`
+- Catharsys Blender render action settings use the DTI `/catharsys/blender/render/settings/main:1`
 
 For example, setting `bpy.context.scene.render.use_persistent_data` to `true` and `bpy.context.scene.cycles.tile_size` to 4096, is done in this way:
 
-:::json
-	lSettings: [
+```json
+	"lSettings": [
         { 
-            sDTI: "/catharsys/blender/render/settings/render:1",
-            use_persistent_data: true, 
+            "sDTI": "/catharsys/blender/render/settings/render:1",
+            "use_persistent_data": true, 
         },
         { 
-            sDTI: "/catharsys/blender/render/settings/cycles:1",
-            tile_size: 4096,
+            "sDTI": "/catharsys/blender/render/settings/cycles:1",
+            "tile_size": 4096,
         },
     ],
-:::
+```
 
 To find out the Blender variable names, right-click on the option in Blender you want to change and select "Copy Full Data Path". Paste this to an editor and just use the part behind `render` or `cycles`, respectively. 
+
+#### Render Setting
+
+Some important render settings (`/catharsys/blender/render/settings/render:1`) are:
+
+| Element | Values | Description |
+|----------|----------|----------|
+| engine | "BLENDER_EEVEE", "BLENDER_WORKBENCH", "CYCLES" | This selects the render engine in Blender |
+
+For example,
+```json
+	"lSettings": [
+        { 
+            "sDTI": "/catharsys/blender/render/settings/render:1",
+            "engine": "CYCLES"
+        },
+    ],
+```
+#### CYCLES Setting
+
+Some important settings for **CYCLES** (`/catharsys/blender/render/settings/cycles:1`) are:
+
+| Element | Values | Description |
+|----------|----------|----------|
+| sComputeDeviceType | "OPTIX", "CUDA"  | This is a setting that is not directly applied to an element of cycles object in Blender. It sets which computing device to use. Usually only works if `device` is `GPU`. |
+| bCombinedCpuCompute    | true, false    | Whether to combine the compute power of the CPU and GPU if a GPU is available and selected.    |
+| device    | "CPU", "GPU"    | Select whether to render on the CPU or GPU    |
+
+For example,
+```json
+	"lSettings": [
+        { 
+            "sDTI": "/catharsys/blender/render/settings/cycles:1",
+            "sComputeDeviceType": "OPTIX",
+            "bCombinedCpuCompute": false,
+            "device": "GPU"
+        },
+    ],
+```
+
+#### Catharsys Render Setting
+
+There is currently only one one setting to modify the Catharsys Blender render action. The setting is `bTransformSceneToCameraFrame`, which determines, whether the whole scene is transformed so that the currently active camera is at the world origin, or not. 
+
+For example,
+```json
+	"lSettings": [
+        {
+            "sDTI": "/catharsys/blender/render/settings/main:1",
+            // Transform scene to camera frame, so that the active camera 
+            // is at the world origin. This is needed to ensure that the
+            // polynomial, pingen and LFT cameras render properly.
+            "bTransformSceneToCameraFrame": true,
+        },
+    ],
+```
+For more information see also {external+image-render-blender-camera:doc}`lut-camera` and {external+image-render-blender-camera:doc}`special-camera-render`.
+
 
 ### Outputs
 
@@ -416,27 +475,27 @@ These output types are similar to the render layers of Blender. However, these e
 
 Each of the above render output types has different additional parameters. For this example, we will only consider the image output type. The configuration looks like this:
 
-:::json
+```json
 {
-    sDTI: "/catharsys/blender/render/output/image:1",
+    "sDTI": "/catharsys/blender/render/output/image:1",
 
-    mCompositor: {
-        sDTI: "/catharsys/blender/compositor:1",
+    "mCompositor": {
+        "sDTI": "/catharsys/blender/compositor:1",
 
-        lFileOut: [
+        "lFileOut": [
             { 
-                sOutput: "Image",
-                sFolder: "Image",
-                sContentType: "image",
+                "sOutput": "Image",
+                "sFolder": "Image",
+                "sContentType": "image",
                 "mFormat" : { 
-                    sFileFormat: "PNG",
-                    sColorDepth: "8"
+                    "sFileFormat": "PNG",
+                    "sColorDepth": "8"
                 }
             },
         ]
     }
 } // output type 'image'
-:::
+```
 
 #### Compositor
 
@@ -497,14 +556,14 @@ Write the compositor node output of the node `Out:NoiseImage:RGB` to the folder 
 
 The capture configuration for standard rendering is pretty basic, as it just contains the framerate to use. In this example the capture configuration looks like this:
 
-:::{json}
+```json
 {
-    sDTI: "/catharsys/capture/std:1.0",
+    "sDTI": "/catharsys/capture/std:1.0",
 
-    sId: "${filebasename}",
-    dFPS: 30.0
+    "sId": "${filebasename}",
+    "dFPS": 30.0
 }
-:::
+```
 
 The element `dFPS` specifies the framerate as floating point value. For a rolling shutter rendering, there are number of additional parameters, specifying exactly the type of rolling shutter that is to be simulated. This will be discussed with the rolling shutter render action.
 
