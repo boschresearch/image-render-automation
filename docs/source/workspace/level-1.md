@@ -16,7 +16,7 @@
     
 </LICENSE>
 --->
-# Level 1 - "Just Render" Configuration
+# Level 1 - Basic Configuration Details
 
 This workspace demonstrates the minimal setup to render anything with Catharsys. This is also the first step in a series of documents introducing the various aspects of Catharsys setup by step.
 
@@ -109,36 +109,36 @@ The launch file must be called `launch.json` or `launch.json5` and is meant to s
 
 ### Actions
 
-:::json
+```json
 {
     // The type identifier of this file
-    sDTI: "/catharsys/launch:3.0",
+    "sDTI": "/catharsys/launch:3.0",
     
     // The id of this launch parameter set
-    sId: "$filebasename",
+    "sId": "$filebasename",
     
     // Some information what this configuration is for
-    sInfo: "Minimal workspace for rendering with Blender file",
+    "sInfo": "Minimal workspace for rendering with Blender file",
 
     // The map of all actions that can be launched
-    mActions: {
+    "mActions": {
         // An arbitrarily chosen name for an action.
         // In this case it makes sense to call it 'render', as it
         // executes the rendering action.
-        run: {
-            sDTI: "/catharsys/launch/action:1.0",
+        "run": {
+            "sDTI": "/catharsys/launch/action:1.0",
             // The id of the action
-            sActionDTI: "/catharsys/action/std/blender/render/std:1.0",
+            "sActionDTI": "/catharsys/action/std/blender/render/std:1.0",
             
             // The action configuration
-            mConfig: {
+            "mConfig": {
                 // ...
             }
             // ...
         }
     }
 }
-:::
+```
 
 For the naming convention and the meaning of the `sDTI` elements, see the {doc}`workspace basics <basics>` documentation. 
 
@@ -158,26 +158,26 @@ When an action is installed in the Conda environment, it registers its' name (th
 
 The action configuration parameters are contained in the `mConfig` block. In this example,
 
-:::json
-mConfig: {
-    sDTI: "/catharsys/launch/args:1.1",
-    sInfo: "Render blender file",
+```json
+"mConfig": {
+    "sDTI": "/catharsys/launch/args:1.1",
+    "sInfo": "Render blender file",
 
     // IMPORTANT: All files of type '.json', '.json5' and '.ison' can be
     //            referenced by their basename alone, without the extension.
     //            The appropriate extension is added automatically.
 
     // The name of the trial file to use.
-    sTrialFile: "trial",
+    "sTrialFile": "trial",
 
     // The execution configuraion file.
     // IMPORTANT: All file paths are regarded as relative 
     //            to the path of the current file.
-    sExecFile: "exec",
+    "sExecFile": "exec",
 
     // [...]
 }
-:::
+```
 
 The `sInfo` element gives a short info about the action, which is displayed by the command `cathy ws info`.
 
@@ -207,22 +207,22 @@ The render action expects a number of additional parameters in the `mConfig` blo
 
 Before we discuss the execution file, a short aside explaining the `__platform__` element, that can be used as part of any dictionary. Before a dictionary is parsed by the configuration parser ({external+functional-json:doc}`ISON parser <language>`), it looks for a `__platform__` element. This can be part of any dictionary not just at the top level of a JSON file. The `__platform__` block is replaced by a `__data__` block depending on the operating system and node (machine name). This is best seen in an example,
 
-:::json
+```json
 {
-    sDTI: "/catharsys/exec/blender/std:2.1",
-    sId: "${filebasename}",
+    "sDTI": "/catharsys/exec/blender/std:2.1",
+    "sId": "${filebasename}",
 
-    __platform__: {
-        Windows: {
-            __data__: {
-                sDTI: "/catharsys/exec/blender/std:2.1"
+    "__platform__": {
+        "Windows": {
+            "__data__": {
+                "sDTI": "/catharsys/exec/blender/std:2.1"
             }
         },
-        Linux: {
+        "Linux": {
             "hi-025l": {
-                __data__: {
+                "__data__": {
                     // Use the LSF job distribution system (must be installed on system)
-                    sDTI: "/catharsys/exec/blender/lsf:2.1",
+                    "sDTI": "/catharsys/exec/blender/lsf:2.1",
 
                     // [...]
                 },
@@ -230,7 +230,7 @@ Before we discuss the execution file, a short aside explaining the `__platform__
         },
     },
 }
-:::
+```
 
 The whole `__platform__` block is replaced by the *contents* of the corresponding `__data__` block, depending on the operating system, `Windows` or `Linux`, and for Linux only if the current node is called `hi-025l`. The contents of the `__data__` block overwrites any elements of the same name defined outside the `__platform__` block. In this case, the `sDTI` element at the top will be overwritten by the platform specific `sDTI` element.
 
@@ -264,24 +264,24 @@ From the overview of the Catharsys system, recall that one of the design princip
 
 Here is the manifest file of the example workspace we installed:
 
-:::{code-block} json
+```json
 {
-    sDTI: "/catharsys/manifest:1.1",
-    sId: "${filebasename}",
+    "sDTI": "/catharsys/manifest:1.1",
+    "sId": "${filebasename}",
 
-    mActions: {
-        run: {
-            sDTI: "manifest/action:1",
-            lConfigs: [
-                { sId: "render", sDTI: "blender/render/output-list:1", sForm: "file/json", bAddToPath: false },
-                { sId: "capture", sDTI: "capture/std:1", sForm: "file/json", bAddToPath: false },
-                { sId: "camera", sDTI: "camera-name:1", sForm: "value", bAddToPath: true },
+    "mActions": {
+        "run": {
+            "sDTI": "manifest/action:1",
+            "lConfigs": [
+                { "sId": "render", "sDTI": "blender/render/output-list:1", "sForm": "file/json", "bAddToPath": false },
+                { "sId": "capture", "sDTI": "capture/std:1", "sForm": "file/json", "bAddToPath": false },
+                { "sId": "camera", "sDTI": "camera-name:1", "sForm": "value", "bAddToPath": true },
             ],
-            lDeps: []
+            "lDeps": []
         },
     }
 }
-:::
+```
 
 The main part of the manifest file is the `mAction` dictionary. This dictionary must list the action(s) you want to use it for with exactly the same name as in the launch file. In this case, this is only the action `run`. For each action the list of configuration types must be defined in the `lConfigs` list. Each element of the `lConfigs` list is a dictionary with the following elements:
 
@@ -358,22 +358,22 @@ For a more complex setup, there can be many more configuration files for the ren
 
 The file `render.json5` specifies parameters for the Blender ray tracer and the types of outputs generated. The main structure of the file looks like this:
 
-:::json
+```json
 {
-    sDTI: "/catharsys/blender/render/output-list:1",
-	sId: "${filebasename}",
+    "sDTI": "/catharsys/blender/render/output-list:1",
+	"sId": "${filebasename}",
 
-	lSettings: [
-        { // settings type 1 },
-        { // settings type 2 },
+	"lSettings": [
+        { }, // settings type 1
+        { }, // settings type 2
     ],
 
-    lOutputs: [
-        { // Output configuration 1 },
-        { // Output configuration 2 },
+    "lOutputs": [
+        { }, // Output configuration 1
+        { }, // Output configuration 2
     ] // lOutputs
 }
-:::
+```
 
 ### Settings
 

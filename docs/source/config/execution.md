@@ -67,11 +67,11 @@ Note that Blender addons are simply zip files at the top level. To use an addon 
 
 The `mPreferences` dictionary in the `mSettings` dictionary, defines preferences to be set in Blender. The key is the name of the preference in Blender and the value the value you want to set. For example, if you want to enable that zooming in Blender zooms to the mouse pointer, you need to write,
 
-:::json
-mPreferences: {
-    inputs: {
-        use_zoom_to_mouse: true,
+```json
+"mPreferences": {
+    "inputs": {
+        "use_zoom_to_mouse": true,
     }
 }
-:::
+```
 
