@@ -29,7 +29,7 @@ The automation system for action execution
 
 
 .. toctree::
-   :maxdepth: 2
+   :maxdepth: 3
    :caption: Contents:
 
    workspace/basics
