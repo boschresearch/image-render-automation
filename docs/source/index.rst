@@ -32,6 +32,7 @@ The automation system for action execution
    :maxdepth: 3
    :caption: Contents:
 
+   reference/main
    workspace/basics
    workspace/level-1
    config_proc

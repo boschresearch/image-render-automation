@@ -82,6 +82,7 @@ See the configuration `vars/test-01` in the example workspace `image-render-work
 | `id`           | A dictionary of all configuration dictionaries, using the trial config id. See below.   |
 | `value`        | The currently processed configuration dictionary.                                       |
 
+(var-action)=
 ### The dictionary `action`
 
 The following variables are members of the `action` dictionary. For example, the variable `name` in the table below, can be accessed via `${action:name}`. As another example, you can access the action parameter `iFrameStart` via `${action:args:iFrameStart}`.

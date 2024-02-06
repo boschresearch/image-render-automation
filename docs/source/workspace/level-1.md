@@ -103,6 +103,7 @@ The file `Launch.ipynb` is a Jupyter notebook that allows to launch actions and 
 
 Now, let's now have a look at the various configuration files.
 
+(launch-file-info)=
 ## The Launch File
 
 The launch file must be called `launch.json` or `launch.json5` and is meant to simplify starting an action for a configuration. Instead of putting all the necessary parameters in a command line, they are contained in the launch file. The launch file in this example contains documentation for all the parameters. In the following, the most important parts are discussed here.
@@ -311,24 +312,24 @@ In the above example, only the camera name is used to generate the output path. 
 
 The trial file specifies which configurations to use for the configuration types given in the manifest file. The example trial file looks like this:
 
-:::{json}
+```json
 {
-    sDTI: "/catharsys/trial:1.0",
-    sId: "${rel-path-config}",
+    "sDTI": "/catharsys/trial:1.0",
+    "sId": "${rel-path-config}",
     
-    sManifestFile: "manifest",
-    mConfigs: {
-        render: ["render"],
-        capture: ["capture"],
-        camera: [ "Camera" ],
+    "sManifestFile": "manifest",
+    "mConfigs": {
+        "render": ["render"],
+        "capture": ["capture"],
+        "camera": [ "Camera" ],
     },
 
-    mBlender: {
-        sDTI: "/catharsys/trial/blender:1.0",
-        sBlenderFile: "${path-config}/Test.blend",
+    "mBlender": {
+        "sDTI": "/catharsys/trial/blender:1.0",
+        "sBlenderFile": "${path-config}/Test.blend",
     }
 }
-:::
+```
 
 The elements of the trial file are:
 
