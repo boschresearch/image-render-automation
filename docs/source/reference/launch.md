@@ -118,21 +118,57 @@ The `mGlobalArgs` dictionary defines default values that are used by all actions
 This dictionary should probably be called `mDefaultArgs` instead. This may be changed in a future version.
 ```
 
-| Tag                 | Type   | Description                                                           | Value Constraints                            | Example   |
-| ------------------- | ------ | --------------------------------------------------------------------- | -------------------------------------------- | --------- |
-| sDTI                | string | DTI of launch arguments structure. Must be this value.                | `/catharsys/launch/args:1.1`                 |           |
-| sTrialFile          | string | Name of the trial configuration file to be used.                      | Relative path to file. Extension not needed. | `"trial"` |
-| sExecFile           | string | Name of the execution configuration file to be used.                  | Relative path to file. Extension not needed. | `"exec"`  |
-| iFrameFirst         | int    | Index of first frame to render.                                       | `>= 0`                                       | 1         |
-| iFrameLast          | int    | Index of last frame to render.                                        | `>= iFrameFirst`                             | 1         |
-| iFrameStep          | int    | Frame increment                                                       | `>= 1`                                       | 1         |
-| iRenderQuality      | int    | Render quality. For Blender the number of rays per pixel.             | `>= 1`                                       | 256       |
-| sTopFolder          | string | (opt) If given, defines the name of the top production folder.        | Any string that can be used as folder name.  | `"blend"` |
-| bDoProcess          | bool   | Flag whether to perform action (true) or just generate config.        | true, false                                  | true      |
-| bDoOverwrite        | bool   | Flag whether to overwrite files (true) or not.                        | true, false                                  | false     |
-| bDoStoreProcessData | bool   | For Blender render action stores the generated/modified Blender file. | true, false                                  | false     |
+| Tag                 | Type   | Description                                                              | Value Constraints                            | Example   |
+| ------------------- | ------ | ------------------------------------------------------------------------ | -------------------------------------------- | --------- |
+| sDTI                | string | DTI of launch arguments structure. Must be this value.                   | `/catharsys/launch/args:1.1`                 |           |
+| sTrialFile          | string | Name of the trial configuration file to be used.                         | Relative path to file. Extension not needed. | `"trial"` |
+| sExecFile           | string | Name of the execution configuration file to be used.                     | Relative path to file. Extension not needed. | `"exec"`  |
+| iFrameFirst         | int    | Index of first frame to render.                                          | `>= 0`                                       | 1         |
+| iFrameLast          | int    | Index of last frame to render.                                           | `>= iFrameFirst`                             | 1         |
+| iFrameStep          | int    | Frame increment                                                          | `>= 1`                                       | 1         |
+| iRenderQuality      | int    | Render quality. For Blender the number of rays per pixel.                | `>= 1`                                       | 256       |
+| sTopFolder          | string | (opt) If given, defines the name of the top production folder.           | Any string that can be used as folder name.  | `"blend"` |
+| bDoProcess          | bool   | Flag whether to perform action (true) or just generate config.           | true, false                                  | true      |
+| bDoOverwrite        | bool   | Flag whether to overwrite files (true) or not.                           | true, false                                  | false     |
+| bDoStoreProcessData | bool   | For Blender render action stores the generated/modified Blender file.    | true, false                                  | false     |
+| iConfigGroups       | int    | Number of execution groups, configurations are collected in.             | `>= 0`, see [](#execution-groups)            | 1         |
+| iFrameGroups        | int    | Number of execution group, frames are collected in.                      | `>= 0`, see [](#execution-groups)            | 1         |
+| iConfigsPerGroup    | int    | Number of configurations per group. Takes prevalence over iConfigGroups. | `>= 1`, see [](#execution-groups)            | 2         |
+| iFramesPerGroup     | int    | Number of frames per group. Takes prevalence over iConfigGroups.         | `>= 1`, see [](#execution-groups)            | 2         |
+| iMaxLocalWorkers    | int    | Maximal number of parallel local processes.                              | `>= 1`, see [](#execution-groups)            | 5         |
 
 ```{Note}
 Apart from the elements given in the table, you can add any other element to the launch arguement dictionary block in the JSON file. All launch arguments are available to all other configurations via the dictionary `${action:args}`. 
 For example, to access the `iFrameFirst` element of the current action, use `${action:args:iFrameFirst}`. If you add some other element `foo` to the launch arguments, then it is accessible via `${action:args:foo}`. See also [](var-action).
 ```
+
+### Execution Groups
+
+The parameters `iConfigGroups` and `iFrameGroups` are useful when processing
+multiple jobs in parallel. 
+
+`iConfigGroups` defines into how many groups all configurations are split.
+The number of configurations is determined by the trial configuration.
+For values <= 0, there is one group for each configuration.
+
+`iFrameGroups` defines into how many groups all frames are split.
+
+The total number of jobs generated are the number of configuration groups
+times the number of frame groups.
+
+For example, suppose there are three configurations, each with 10 frames,
+and `iConfigGroups = 0` and `iFrameGroups = 2`, then there are `3*2 = 6` jobs,
+two jobs per configuration each rendering 5 frames.
+
+Instead of specifying the number of config and frame groups, you can 
+also set the number of configs and frames per group. If these values
+are specified they take prevalence over `iConfigGroups` and `iFrameGroups`.
+The number of config groups and frame groups are then calculated 
+from these values.
+
+The parameter `iMaxLocalWorkers` specifies the maximal number of parallel
+local processes. So, even if there are 100 jobs that need execution, only
+`iMaxLocalWorkers` of them are run concurrently. 
+If you are running on an job scheduling system like LSF, then this parameter
+only gives the number of parallel processes that register LSF jobs. The number
+of jobs the LSF system runs in parallel is specified by the execution configuration.
