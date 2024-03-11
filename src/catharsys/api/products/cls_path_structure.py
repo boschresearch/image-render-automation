@@ -173,12 +173,30 @@ class CPathStructure:
                         lCat.append(xCat)
                     # endfor
 
+                    sReParseValue: str = _dicUserVars[sVarId].get("sRegExParseValue")
+                    if sReParseValue is not None:
+                        try:
+                            reValue = re.compile(sReParseValue)
+                        except Exception as xEx:
+                            raise RuntimeError(
+                                f"Invalid regular expression given in 'sRegExParseValue' for user variable '{sItem}'.\n"
+                                f"{(str(xEx))}"
+                            )
+                        # endtry
+                        if reValue.groups < 1:
+                            raise RuntimeError(
+                                f"Regular expression given in 'sRegExParseValue' for user variable '{sItem}' "
+                                "must contain at least one capture group."
+                            )
+                        # endif
+                    # endif
+
                     self._dicVars[sVarId] = CPathVar(
                         sId=sVarId,
                         sName=_dicUserVars[sVarId].get("sName", sVarId),
                         eType=EPathVarType.USER,
                         eNodeType=eNodeType,
-                        sReParseValue=_dicUserVars[sVarId].get("sRegExParseValue"),
+                        sReParseValue=sReParseValue,
                         sReReplaceValue=_dicUserVars[sVarId].get("sRegExReplaceValue"),
                         lCategories=lCat,
                     )
