@@ -257,6 +257,7 @@ Since every action specifies an execution configuration, you can use different B
 For a description of all elements of an execution file see {doc}`this documentation <../config/execution>`.
 
 
+(manifest-file-info)=
 ## The Manifest File
 
 Before discussing the trial file, we first need to understand the manifest file, which is referenced by the trial file. Recall that each action specified in the launch file can reference a different trial file, which means that each action could have a different manifest file. However, typically there is one manifest file per configuration.

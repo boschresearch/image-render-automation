@@ -94,6 +94,7 @@ The following variables are members of the `action` dictionary. For example, the
 | `config` | The action configuration dictionary. These are not the action arguments. |
 | `args`   | The action launch arguments.                                             |
 
+(config-id-dict)=
 ### The dictionary `id`
 
 The following variables are members of the `id` dictionary. The elements of the `id` dictionary are the id names used in the trial file (and declared in the manifest) to specify the configurations. For example, if your trial file specifies the capture configuration to use via the id `cap`, you can access the full capture configuration dictionary via `${id:cap:value}`. The following table gives the elements available per id dictionary element.
