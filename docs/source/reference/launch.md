@@ -10,7 +10,7 @@ The launch configuration defines and parametrizes the actions you can execute in
 | sId         | string | Id of launch file.                                  | Any string.                    | `$filebasename` |
 | sInfo       | string | Information string shown by command `cathy ws info` | Any string.                    |                 |
 | mGlobalArgs | dict   | Default arguments used by all actions.              | See [below](#launch-arguments) |                 |
-| mActions    | dict   | Definition of actions that can be executed.         | See [below](#action-arguments)                      |                 |
+| mActions    | dict   | Definition of actions that can be executed.         | See [below](#action-arguments) |                 |
 
 ## Action Arguments
 

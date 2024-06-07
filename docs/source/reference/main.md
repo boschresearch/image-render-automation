@@ -8,4 +8,5 @@ caption: Contents
 ---
 
 launch
+manifest
 ```
