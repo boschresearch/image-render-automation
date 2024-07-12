@@ -47,6 +47,10 @@ class CConfigLaunch:
         return self._dicLaunch.get("sInfo", "")
 
     @property
+    def sInfoFile(self) -> str | None:
+        return self._dicLaunch.get("sInfoFile")
+    
+    @property
     def dicRuntimeVars(self):
         return self._dicRtv
 

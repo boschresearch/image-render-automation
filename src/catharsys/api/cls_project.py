@@ -55,6 +55,10 @@ class CProject:
         return self._xLaunch.sInfo
 
     @property
+    def sInfoFile(self) -> str | None:
+        return self._xLaunch.sInfoFile
+    
+    @property
     def lActions(self) -> list[str]:
         return self._lActionPaths
 
