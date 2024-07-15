@@ -47,12 +47,14 @@ class CProducts:
         self,
         *,
         _prjX: CProject,
+        _pathOutput: Path | None = None,
     ):
         self._xProject: CProject = _prjX
         self._dicGroups: dict[str, CGroup] = dict()
         self._dtProdFile: datetime = None
         self._dtScanProdFile: datetime = None
         self._lMessages: list[str] = []
+        self._pathOutput: str | None = _pathOutput
 
         self._dicSystemVars: dict[str, CPathVar] = {
             "production": CPathVar(
@@ -184,7 +186,10 @@ class CProducts:
         for sGroup in dicGroups:
             try:
                 self._dicGroups[sGroup] = CGroup(
-                    _sId=sGroup, _prjX=self._xProject, _dicPathSystemVars=self._dicSystemVars
+                    _sId=sGroup, 
+                    _prjX=self._xProject, 
+                    _dicPathSystemVars=self._dicSystemVars,
+                    _pathOutput=self._pathOutput,
                 )
                 self._dicGroups[sGroup].FromConfig(dicGroups[sGroup])
             except Exception as xEx:

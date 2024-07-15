@@ -35,10 +35,11 @@ from .cls_node import ENodeType
 
 class CVariantGroupProducts(CProducts):
     def __init__(self, *, _xVariantGroup: CVariantGroup):
-        super().__init__(_prjX=_xVariantGroup.xProject)
+        pathVariantOutput: Path = _xVariantGroup.xProject.xConfig.pathOutput / _xVariantGroup.sGroup
+        pathVariantOutput.mkdir(parents=True, exist_ok=True)
+        super().__init__(_prjX=_xVariantGroup.xProject, _pathOutput=pathVariantOutput)
         self._xVarGrp: CVariantGroup = _xVariantGroup
         self._reGroup: re.Pattern = re.compile(f"{self._xVarGrp.sGroup}-(\\d+)-(\\d+)")
-
         self.RegisterSystemVar(
             CPathVar(
                 sId="variant",

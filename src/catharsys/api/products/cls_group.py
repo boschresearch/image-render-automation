@@ -70,7 +70,13 @@ class CJsonNodeEncoder(json.JSONEncoder):
 
 
 class CGroup:
-    def __init__(self, *, _sId: str, _prjX: CProject, _dicPathSystemVars: dict[str, CPathVar] = None):
+    def __init__(self, 
+                 *, 
+                 _sId: str, 
+                 _prjX: CProject,
+                  _dicPathSystemVars: dict[str, CPathVar] = None,
+                  _pathOutput: Path | None = None,
+                  ):
         self._xProject: CProject = _prjX
         self._sId: str = _sId
         self._sName: str = None
@@ -79,6 +85,7 @@ class CGroup:
         self._xTree: CNode = None
         self._xCatCln: CCategoryCollection = CCategoryCollection()
         self._xCatData: CCategoryData = CCategoryData()
+        self._pathOutput: Path | None = _pathOutput
 
         if _dicPathSystemVars is not None:
             self._dicPathSystemVars = _dicPathSystemVars
@@ -323,8 +330,9 @@ class CGroup:
             "lCommonArtefactVarIds": self._lCommonArtVarIds,
         }
 
+        pathOutput = self._xProject.xConfig.pathOutput if self._pathOutput is None else self._pathOutput
         sPrjId: str = self._xProject.sId.replace("/", "-")
-        pathCatData: Path = self._xProject.xConfig.pathOutput / f"CategoryData_{sPrjId}_{self._sId}.json"
+        pathCatData: Path = pathOutput / f"CategoryData_{sPrjId}_{self._sId}.json"
         if pathCatData.exists():
             self._xCatData.FromFile(pathCatData)
             if self._xCatData.xCatCln != self._xCatCln:

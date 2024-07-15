@@ -146,7 +146,7 @@ class CVariantTrial:
         pathSrc = self.GetConfigSourceAbsPath(_sRelPathFile)
         # print(f"pathSrc: {pathSrc}")
         if pathSrc is None:
-            raise RuntimeError(f"Source file does not exist: {(pathSrc.as_posix())}[.json|.json5|.ison]")
+            raise RuntimeError(f"Source file does not exist: {_sRelPathFile}[.json|.json5|.ison]")
         # endif
 
         sSrcRel = self.GetConfigVariantRelPathFromSourceAbsPath(pathSrc)
