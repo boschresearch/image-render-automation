@@ -23,6 +23,7 @@
 import re
 from pathlib import Path
 from typing import Iterator
+import getpass
 
 from catharsys.config.cls_variant_group import CVariantGroup
 from catharsys.config.cls_variant_project import CVariantProject
@@ -35,7 +36,8 @@ from .cls_node import ENodeType
 
 class CVariantGroupProducts(CProducts):
     def __init__(self, *, _xVariantGroup: CVariantGroup):
-        pathVariantOutput: Path = _xVariantGroup.xProject.xConfig.pathOutput / _xVariantGroup.sGroup
+        sOsUser: str = getpass.getuser().lower()
+        pathVariantOutput: Path = _xVariantGroup.xProject.xConfig.pathOutput / sOsUser / _xVariantGroup.sGroup
         pathVariantOutput.mkdir(parents=True, exist_ok=True)
         super().__init__(_prjX=_xVariantGroup.xProject, _pathOutput=pathVariantOutput)
         self._xVarGrp: CVariantGroup = _xVariantGroup

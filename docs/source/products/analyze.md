@@ -103,8 +103,10 @@ Apart from a display name for user variables, you can also specify a regular exp
 
 You can also specify a replace regular expression using the element `sRegExReplaceValue`, which can be used in conjunction with `sRegExParseValue`, to replace the display value of the variable. For example, with
 
-    sRegExParseValue: "^Frame_(\\d+).png",
-    sRegExReplaceValue: "\\1"
+```json
+    "sRegExParseValue": "^Frame_(\\d+).png",
+    "sRegExReplaceValue": "\\1"
+```
 
 only filenames of the type `Frame_[number].png` are accepted, but only the extracted frame number is displayed in the viewer. A full user variable definition could look like this:
 

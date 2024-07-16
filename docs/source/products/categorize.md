@@ -1,6 +1,8 @@
 # Production Categorization
 
-It can be helpful to annotate the generated data with respect to a set of user defined categories. With the Catharsys production viewer, categories can be defined and associated with path structure variables and set in the web view. The annotations are stored in a JSON file in the `_output` directory of the corresponding workspace. For example, the user can define a boolean category 'bad' for a 'frame' variable, so that bad frames can be marked in the viewer.
+It can be helpful to annotate the generated data with respect to a set of user defined categories. With the Catharsys production viewer, categories can be defined and associated with path structure variables and set in the web view. The annotations are stored in a JSON file in the `_output/[os user]/[web user]` directory of the corresponding workspace. The `os-user` is the user logged into the OS and the `web-user` is the user logged into the Catharsys web GUI. If no explicit web users were created, the `web-user` is `public`. 
+
+For example, the user can define a boolean category 'bad' for a 'frame' variable, so that bad frames can be marked in the viewer.
 
 The following examples are taken from [production configuration](https://github.com/boschresearch/image-render-workspace-examples/blob/main/config/usecase/generative/production.json5) of the `usecase/generative` configuration of the `image-render-workspace-examples` [module](https://github.com/boschresearch/image-render-workspace-examples).
 
