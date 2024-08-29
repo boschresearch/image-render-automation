@@ -31,6 +31,16 @@ caption: Contents
 
 Whenever a configuration file is processed, a number of varibles are available. For example, when processing the file with absolute path `/home/user/myws/config/anim/test-01/launch.json5`, the variables are defined as follows:
 
+```{eval-rst}
+.. index::
+    pair: filebasename; The file's basename without suffix
+    pair: filename; The filename
+    pair: folder; The file's folder name
+    pair: parentfolder; The file's parent folder name
+    pair: path; The path to the file
+    pair: filepath; The full file path
+```
+
 | Variable       | Description                        | Example                                            |
 | -------------- | ---------------------------------- | -------------------------------------------------- |
 | `filebasename` | The file's basename without suffix | `launch`                                           |
