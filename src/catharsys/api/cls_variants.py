@@ -263,7 +263,14 @@ class CVariants:
 
         # Copy variant trial files
         lSrcTrgPaths = xTrialVar.CreateVariantSourceTargetPaths(xInst.pathInstance)
-        sTrialBaseId = f"{self._xProject.xConfig.sLaunchFolderName}/{xInst.sName}"
+        sLaunchFolderName = self._xProject.xConfig.sLaunchFolderName
+        # If multiple actions are excecuted on same config, the instance folder names
+        # contain a "@" symbol at the end. This has to be removed from the sTrialBaseId
+        # so that the render target paths are consistent.
+        if "@" in sLaunchFolderName:
+            sLaunchFolderName = sLaunchFolderName.split("@")[0]
+        # endif
+        sTrialBaseId = f"{sLaunchFolderName}/{xInst.sName}"
         pathSrc: Path = None
         pathTrg: Path = None
         bIsConfigFile: bool = False
@@ -289,6 +296,12 @@ class CVariants:
                     sId: str = dicCfg.get("sId", "")
                     if "${rel-path-config}" in sId:
                         sId = sId.replace("${rel-path-config}", sTrialBaseId)
+                        bChanged = True
+                    # endif
+
+                    if "${folder}" in sId or "$folder" in sId:
+                        sId = sId.replace("${folder}", sTrialBaseId)
+                        sId = sId.replace("$folder", sTrialBaseId)
                         bChanged = True
                     # endif
 
