@@ -86,6 +86,9 @@ class CProductAvailability:
 
     # enddef
 
+    def GetSelArtefactTypeIds(self) -> list[str]:
+        return list(self._dicSelArtVarValLists.keys())
+
     def _DoTestGrpAvailability(self, _xRoot: CNode, _iLevel: int):
         lSelGrpVarVal = self._lSelGrpVarValLists[_iLevel]
         xMissing = CMissing(_xRoot, _iLevel, [])
@@ -203,7 +206,8 @@ class CProductAvailability:
         for sArtTypeId in lArtTypeIds:
             lMissing = self._dicMissing.get(sArtTypeId)
             if lMissing is None:
-                raise RuntimeError(f"Artefact type id '{sArtTypeId}' not available")
+                dicVarValMissing[(f"{sArtTypeId}",)] = set(["No data available"])
+                continue
             # endif
             for xMissing in lMissing:
                 xVarNode: CNode = xMissing.xNode.ancestors[iVarLevel + 1]
@@ -348,7 +352,7 @@ class CProductAvailability:
             "lPathVarIds": self._xGrp.xPathStruct.lPathVarIds,
             "sProdVarId": _sVarId,
             "lArtefactTypeIds": _lArtTypeIds,
-            "lMissing": lMissing,
+            "lMissing": [{"sPath": x.tPath, "lValues": x.lValues} for x in lMissing],
         }
 
         anyfile.SaveJson(_pathFile, dicData, iIndent=_iIndent)

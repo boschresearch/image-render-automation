@@ -230,7 +230,10 @@ def RunAnalysis(
 
             dicSave: dict = dicAna.get("mSave")
             if isinstance(dicSave, dict):
-                sArtTypeName = "-".join(lArtTypeIds)
+                if lArtTypeIds is None:
+                    sArtTypeName = "-".join(xProdAvail.GetSelArtefactTypeIds())
+                else:
+                    sArtTypeName = "-".join(lArtTypeIds)
                 sFileId = xPrj.sId.replace("/", "_")
 
                 pathMissing: Path = (
@@ -239,6 +242,7 @@ def RunAnalysis(
                 sSavePath: str = convert.DictElementToString(dicSave, "sPath", sDefault=None, bDoRaise=False)
                 if sSavePath is not None:
                     pathMissing = anypath.MakeNormPath(sSavePath).absolute()
+                    pathMissing.parent.mkdir(parents=True, exist_ok=True)
                 # endif
 
                 iIndent: int = convert.DictElementToInt(dicSave, "iIndent", iDefault=-1)
