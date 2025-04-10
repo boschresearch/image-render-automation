@@ -101,6 +101,7 @@ def Copy(*, sCfgNameSource: str, sCfgNameTarget: str, sPathWorkspace: str):
             r"__pycache__",
             r".+\.egg-info",
             r"_blender",
+            r"\.variants.*",
         ]
 
         lReExcludeFiles = [
