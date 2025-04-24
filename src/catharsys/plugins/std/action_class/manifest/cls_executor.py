@@ -396,6 +396,15 @@ class CActionClassManifestExecutor(CActionClassExecutor):
         if dicRes["lCfgVer"][1] == 0:
             # Number of groups all frames are split in
             iFrameGroups = convert.DictElementToInt(self.dicActArgs, "iJobsPerConfig", iDefault=1)
+            lUnsupported: list[str] = ["iFrameGroups", "iFramesPerGroup", "iConfigsPerGroup",
+                                       "iConfigGroups", "iMaxLocalWorkers"]
+            for sKey in lUnsupported:
+                if sKey in self.dicActArgs:
+                    raise RuntimeError(f"Argument '{sKey}' is not supported in this version of the action arguments.\n"
+                                       "Change the 'sDTI' to '/catharsys/launch/args:1.1' or higher.")
+                # endif
+            # endfor
+            
             # Each config triggers a new job
             iConfigGroups = 0
             iMaxLocalWorkers = 1
