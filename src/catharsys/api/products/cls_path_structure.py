@@ -35,6 +35,7 @@ class EPathVarType(enum.Enum):
     FIXED = enum.auto()
     USER = enum.auto()
     SYSTEM = enum.auto()
+    REGEX = enum.auto()
 
 
 # endclass
@@ -128,6 +129,7 @@ class CPathStructure:
         _dicUserSysVars: Optional[dict] = None,
     ):
         lItems: list[str] = self._sPathStruct.split("/")
+        lItems = [x for x in lItems if len(x) > 0]
         for iIdx, sItem in enumerate(lItems):
             bIsLastElement: bool = iIdx == len(lItems) - 1
             eNodeType: ENodeType = self._eLastElementNodeType if bIsLastElement else ENodeType.PATH
@@ -206,6 +208,33 @@ class CPathStructure:
                     )
                 # endif
 
+            elif sItem.startswith("="):
+                sVarId = sItem[1:]
+                if not isinstance(_dicUserVars, dict) or sVarId not in _dicUserVars:
+                    raise RuntimeError(f"Undefined regular expression user variable '{sVarId}'")
+                # endif
+
+                sReParseValue: str = _dicUserVars[sVarId].get("sRegExParseValue")
+                if sReParseValue is None:
+                    raise RuntimeError("A regular expression variable must have a 'sRegExParseValue' entry")
+                # endif
+                try:
+                    reValue = re.compile(sReParseValue)
+                except Exception as xEx:
+                    raise RuntimeError(
+                        f"Invalid regular expression given in 'sRegExParseValue' for user variable '{sItem}'.\n"
+                        f"{(str(xEx))}"
+                    )
+                # endtry
+
+                self._dicVars[sVarId] = CPathVar(
+                    sId=sVarId,
+                    sName=_dicUserVars[sVarId].get("sName", sVarId),
+                    eType=EPathVarType.REGEX,
+                    eNodeType=eNodeType,
+                    sReParseValue=sReParseValue,
+                )
+
             else:
                 self._dicVars[sItem] = CPathVar(sId=sItem, sName=sItem, eType=EPathVarType.FIXED, eNodeType=eNodeType)
             # endif
@@ -222,7 +251,8 @@ class CPathStructure:
         sPathVarId: str = lPathVarIds[_iLevel]
         xPathVar: CPathVar = self.dicVars[sPathVarId]
 
-        # print(f"{sPathVarId} in {_pathScan}")
+        # print(f"lPathVarIds: {lPathVarIds}")
+        # print(f"{sPathVarId} ({xPathVar.eType}) in {_pathScan}")
 
         if xPathVar.eType == EPathVarType.SYSTEM:
             if xPathVar.funcHandler is not None:
@@ -289,11 +319,16 @@ class CPathStructure:
 
         elif xPathVar.eType == EPathVarType.FIXED:
             if _pathScan is None:
-                pathItem = Path(xPathVar.sId)
+                if not ":" in xPathVar.sId:
+                    pathItem = Path("/" + xPathVar.sId)
+                else:
+                    pathItem = Path(xPathVar.sId)
             else:
                 pathItem = _pathScan / xPathVar.sId
             # endif
+            # print(f"pathItem: {pathItem}")
             if pathItem.exists():
+                # print(f"Path item exists: {pathItem}")
                 nodeX = CNode(pathItem.name, parent=_nodeParent, _iLevel=_iLevel, _eType=xPathVar.eNodeType)
                 if xPathVar.eNodeType == ENodeType.PATH and len(lPathVarIds) > _iLevel + 1:
                     self.ScanFileSystem(
@@ -303,6 +338,46 @@ class CPathStructure:
                     )
                 # enddef
             # endif
+        elif xPathVar.eType == EPathVarType.REGEX:
+            if _pathScan is None:
+                pathScan = Path("/")
+            else:
+                pathScan = _pathScan
+            # endif
+            reValue = re.compile(xPathVar.sReParseValue)
+            if reValue is None:
+                raise RuntimeError("A regular expression variable must have a 'sRegExParseValue' entry")
+            # endif
+
+            for pathItem in pathScan.iterdir():
+                if (xPathVar.eNodeType == ENodeType.PATH and not pathItem.is_dir()) or (
+                    xPathVar.eNodeType == ENodeType.ARTEFACT and not pathItem.is_file()
+                ):
+                    continue
+                # endif
+
+                sName = pathItem.name
+                sPathName = pathItem.name
+                xMatch = reValue.fullmatch(pathItem.name)
+                if xMatch is None:
+                    continue
+                # endif
+                # The regular expression variables will always have only one group.
+                sName = sPathVarId
+
+                nodeX = CNode(
+                    sName, parent=_nodeParent, _iLevel=_iLevel, _eType=xPathVar.eNodeType, _sPathName=sPathName
+                )
+                if xPathVar.eNodeType == ENodeType.PATH and len(lPathVarIds) > _iLevel + 1:
+                    self.ScanFileSystem(
+                        _pathScan=pathItem,
+                        _nodeParent=nodeX,
+                        _iLevel=_iLevel + 1,
+                    )
+                # enddef    
+                # Use only the first match
+                break            
+            # endfor
 
         else:
             raise RuntimeError(f"Unsupported path variable type: {xPathVar.eType}")

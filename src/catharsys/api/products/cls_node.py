@@ -158,6 +158,9 @@ class CNode(anytree.NodeMixin):
         lNames = self.lPathNames
         if len(lNames) > 0:
             sName = "/".join(lNames)
+            if ":" not in lNames[0]:
+                sName = "/" + sName
+            # endif
         # endif
         return Path(sName)
 
