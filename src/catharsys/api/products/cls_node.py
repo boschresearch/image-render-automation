@@ -78,7 +78,7 @@ class CNode(anytree.NodeMixin):
         # endif
         sData: str = ""
         if self._xData is not None:
-            sData = f"<{self._xData}>"
+            sData = f"<{self._xData!s}>[{type(self._xData).__name__}]"
         # endif
         sGroup = self.sGroup
         if sGroup is None:
@@ -89,7 +89,7 @@ class CNode(anytree.NodeMixin):
             sArtGroup = ""
         # endif
 
-        return f"{sGroup}:{sArtGroup}:{self._iLevel}> {self._eType} {sData} [{sPath}]"
+        return f"{sGroup}:{sArtGroup}:{self._iLevel}> {self._eType.name} {sData} [{sPath}]"
 
     # enddef
 
