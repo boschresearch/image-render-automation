@@ -86,6 +86,7 @@ class CGroup:
         self._xCatCln: CCategoryCollection = CCategoryCollection()
         self._xCatData: CCategoryData = CCategoryData()
         self._pathOutput: Path | None = _pathOutput
+        self._dicFilters: dict[str, Any] = {}
 
         if _dicPathSystemVars is not None:
             self._dicPathSystemVars = _dicPathSystemVars
@@ -147,6 +148,11 @@ class CGroup:
     def lCommonArtVarIds(self) -> list[str]:
         return self._lCommonArtVarIds
 
+    # enddef
+
+    @property
+    def dicFilters(self) -> dict[str, Any]:
+        return self._dicFilters
     # enddef
 
     # ######################################################################################################
@@ -215,6 +221,8 @@ class CGroup:
         elif dicCategories is not None:
             self._xCatCln.FromConfigDict(dicCategories)
         # endif
+
+        self._dicFilters: dict = _dicCfg.get("mFilters", dict())
 
         self._sName = _dicCfg.get("sName", self._sId)
         self._xPathStruct = CPathStructure(
