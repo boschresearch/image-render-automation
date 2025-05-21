@@ -1,7 +1,8 @@
 # ##################################################################
 # Export catharsys production to xtar format
 # ##################################################################
-
+import os
+import numpy as np
 from tqdm import tqdm
 import shutil
 import xtar
@@ -16,6 +17,10 @@ from catharsys.api.cls_project import CProject
 from catharsys.config.cls_project import CProjectConfig
 # from catharsys.config.cls_launch import CConfigLaunch
 from anybase import convert
+# need to enable OpenExr explicitly
+os.environ["OPENCV_IO_ENABLE_OPENEXR"] = "1"
+import cv2
+
 
 @dataclass
 class CGroupConfig:
@@ -338,26 +343,35 @@ def main():
 
         if xExport.lDataType[0] == "image":
             sImgFormat = xExport.lDataType[1]
-            eImgFormat: xtar.EImageFormat | None = None
-            if sImgFormat == "png":
-                eImgFormat = xtar.EImageFormat.PNG
-            elif sImgFormat == "jpg" or sImgFormat == "jpeg":
-                eImgFormat = xtar.EImageFormat.JPEG
-            elif sImgFormat == "bmp":
-                eImgFormat = xtar.EImageFormat.BMP
-            # endif
-            if eImgFormat is None:
+            if sImgFormat in ["png", "jpg", "jpeg", "bmp"]:
+                eImgFormat: xtar.EImageFormat | None = None
+                if sImgFormat == "png":
+                    eImgFormat = xtar.EImageFormat.PNG
+                elif sImgFormat == "jpg" or sImgFormat == "jpeg":
+                    eImgFormat = xtar.EImageFormat.JPEG
+                elif sImgFormat == "bmp":
+                    eImgFormat = xtar.EImageFormat.BMP
+                # endif
+                lTypes.append(xtar.IOType(xtar.EDataType.IMAGE, xExport.sName, xtar.ImageWriterParams(eImgFormat)))
+                lMetaTypes.append(xtar.IOType(xtar.EDataType.JSON, xExport.sName, xtar.JsonWriterParams()))
+            elif sImgFormat == "exr":
+                lTypes.append(xtar.IOType(xtar.EDataType.ARRAY, xExport.sName, xtar.ArrayWriterParams(zip_compression=True)))
+                lMetaTypes.append(xtar.IOType(xtar.EDataType.JSON, xExport.sName, xtar.JsonWriterParams()))
+            else:
                 print(f"  WARNING: Unsupported image format: {sImgFormat}")
                 print(f"  Ignoring artefact: {xExport.sName}")
                 continue
             # endif
-            lTypes.append(xtar.IOType(xtar.EDataType.IMAGE, xExport.sName, xtar.ImageWriterParams(eImgFormat)))
-            lMetaTypes.append(xtar.IOType(xtar.EDataType.JSON, xExport.sName, xtar.JsonWriterParams()))
 
         elif xExport.lDataType[0] == "data":
-            print(f"  WARNING: Unsupported format: {xExport.lDataType[0]}")
-            print(f"  Ignoring artefact: {xExport.sName}")
-            continue
+            if xExport.lDataType[1] == "json":
+                lTypes.append(xtar.IOType(xtar.EDataType.JSON, xExport.sName, xtar.JsonWriterParams()))
+                lMetaTypes.append(xtar.IOType(xtar.EDataType.JSON, xExport.sName, xtar.JsonWriterParams()))
+            else:
+                print(f"  WARNING: Unsupported data format: {xExport.lDataType[1]}")
+                print(f"  Ignoring artefact: {xExport.sName}")
+                continue
+            # endif
         else:
             print(f"  WARNING: Unsupported format: {xExport.lDataType[0]}")
             print(f"  Ignoring artefact: {xExport.sName}")
@@ -404,7 +418,26 @@ def main():
         for xType in lTypes:
             xExport = dicExport[xType.content_id]
             if iIdx < len(xExport.lArtFilePaths):
-                dicData[xType.content_id] = xExport.lArtFilePaths[iIdx]
+                # Export OpenEXR images as numpy arrays
+                if xExport.lDataType[0] == "image" and xExport.lDataType[1] == "exr":
+                    sFilepath = str(xExport.lArtFilePaths[iIdx])
+                    imgData = cv2.imread(sFilepath, cv2.IMREAD_ANYCOLOR | cv2.IMREAD_ANYDEPTH | cv2.IMREAD_UNCHANGED)
+                    if imgData is None:
+                        print(f"  WARNING: Failed to read image: {sFilepath}")
+                        continue
+                    # endif
+                    if len(imgData.shape) > 2:
+                        # Flip order of color channel elements, as cv2 stores images as BGR and not RGB.
+                        if imgData.shape[2] == 4:
+                            imgData = imgData[:, :, [2, 1, 0, 3]]
+                        else:
+                            imgData = imgData[:, :, ::-1]
+                        # endif
+                    # endif
+                    dicData[xType.content_id] = imgData
+                else:
+                    dicData[xType.content_id] = xExport.lArtFilePaths[iIdx]
+                # endif
             else:
                 print(f"  WARNING: Missing artefact: {xType.content_id}")
             # endif
