@@ -20,26 +20,39 @@
 # </LICENSE>
 ###
 
+import copy
 import os
 import math
 import shutil
 import anybase
+import anybase.config
 import anybase.file
 import ison
 from pathlib import Path
 from dataclasses import dataclass
+from scipy.spatial.transform import Rotation
 
 import numpy as np
 import xtar
-from xtar_ml import BBox3D, BBox3dClnDecoder, BBox3dClnEncoder, BBox3DCollection
+from xtar_ml import (
+    BBox3D, 
+    BBox3dClnEncoder, 
+    BBox3DCollection,
+    ImageBBox2D,
+    ImageBBox2dClnEncoder,
+    ImageBBox2DCollection,
+    CameraCalib,
+    CameraCalibPanoPoly,
+    CameraCalibEncoder,
+)
 
 # from anybase import file as anyfile
 from anybase import path as anypath
-
+from anybase.cls_any_error import CAnyError_Message
 from typing import Any, Callable
 
 # from ison.util import data as isondata
-from anybase import convert
+from anybase import convert, config
 # from anybase.cls_any_error import CAnyError, CAnyError_Message
 
 # from catharsys.config.cls_project import CProjectConfig
@@ -97,7 +110,13 @@ class CArtefactExport:
 @dataclass
 class CLabelExport:
     sName: str
-    xBox3dCln: BBox3dClnEncoder
+    lDataType: list[str]
+    lLabelFilePaths: list[Path]
+    lExcludeLabelIds: list[str]
+    xBox3dClnEnc: BBox3dClnEncoder | None = None
+    xImgBox2dClnEnc: ImageBBox2dClnEncoder | None = None
+    xIdealImgBox2dClnEnc: ImageBBox2dClnEncoder | None = None
+    xCameraCalibEnc: CameraCalibEncoder | None = None
 
 
 class CProductExport:
@@ -195,9 +214,12 @@ class CProductExport:
             self._funcStatus(f"Scan file written to: {self._pathScan.as_posix()}")
 
         else:
+            if _sScanFile == ".":
+                _sScanFile = f"file-scan-{self._xPrj.sId.replace('/', '_')}-{self._sGroupName}.pickle"
+            # endif
             pathScan: Path = anypath.MakeNormPath(_sScanFile)
             if not pathScan.is_absolute():
-                pathScan = self._xPrj.xConfig.pathLaunch / pathScan
+                pathScan = self._xPrj.xConfig.pathOutput / pathScan
             # endif
             pathScan = anypath.ProvideReadFilepathExt(pathScan, [".pickle"])
             if not pathScan.exists():
@@ -437,7 +459,7 @@ class CProductExport:
             if len(xExport.lArtMissing) > 0:
                 lValLists = []
                 for lIdxList in xExport.lArtMissing:
-                    lValues = [xExport.lVarValues[iIdx] for iIdx in lIdxList]
+                    lValues = [xExport.lVarValues[iVarIdx][iValIdx] for iVarIdx, iValIdx in enumerate(lIdxList)]
                     lValLists.append(lValues)
                 # endfor
 
@@ -448,7 +470,7 @@ class CProductExport:
                 }
             # endif
         # endfor
-        anybase.file.SaveJson(pathFile, dicData)
+        anybase.file.SaveJson(pathFile, dicData, iIndent=4)
         self._funcStatus(f"The list of missing artefacts was written to: {pathFile.as_posix()}")
     # enddef
 
@@ -541,24 +563,73 @@ class CProductExport:
                     if not isinstance(dicMetaExport, dict):
                         raise TypeError(f"Element 'export' in 'mMeta' of artefact '{xExport.sName}' is not a dictionary: {type(dicMetaExport)}")
                     
-                    bBox3d: bool = convert.DictElementToBool(dicMetaExport, "bBox3d", False)
-                    bBox2d: bool = convert.DictElementToBool(dicMetaExport, "bBox2d", False)
-                    bIdealBox2d: bool = convert.DictElementToBool(dicMetaExport, "bIdealBox2d", False)
-                    bCamera: bool = convert.DictElementToBool(dicMetaExport, "bCamera", False)
-                    xBox3dCln: BBox3dClnEncoder | None = None
-                    if bBox3d:
-                        xBox3dCln = BBox3dClnEncoder(
-                            content_id="label",
+                    sBasename: str = convert.DictElementToString(dicMetaExport, "sBasename", sDefault=xExport.sName)
+                    lLabelTypes: list[str] = convert.DictElementToStringList(dicMetaExport, "lLabelDataTypes", lDefault=[])
+                    bBox3d: bool = "box3d" in lLabelTypes
+                    bBox2d: bool = "box2d" in lLabelTypes
+                    bIdealBox2d: bool = "ideal_box2d" in lLabelTypes
+                    bCamera: bool = "camera" in lLabelTypes
+
+                    xBox3dClnEnc: BBox3dClnEncoder | None = None
+                    xImgBox2dClnEnc: ImageBBox2dClnEncoder | None = None
+                    xIdealImgBox2dClnEnc: ImageBBox2dClnEncoder | None = None
+                    
+                    if bBox2d:
+                        sContentId = sBasename + "_box2d"
+                        xImgBox2dClnEnc = ImageBBox2dClnEncoder(
+                            content_id=sContentId,
                             meta_data={},
                             has_props=True)
-                        lTypes.extend(xBox3dCln.io_types)
+                        lTypes.extend(xImgBox2dClnEnc.io_types)
                     # endif
 
-
+                    if bIdealBox2d:
+                        sContentId = sBasename + "_ideal_box2d"
+                        xIdealImgBox2dClnEnc = ImageBBox2dClnEncoder(
+                            content_id=sContentId,
+                            meta_data={},
+                            has_props=True)
+                        lTypes.extend(xIdealImgBox2dClnEnc.io_types)
+                    # endif
                     
-                    self._dicLabelExport
+                    if bBox3d:
+                        sContentId = sBasename + "_box3d"
+                        xBox3dClnEnc = BBox3dClnEncoder(
+                            content_id=sContentId,
+                            meta_data={},
+                            has_props=True)
+                        lTypes.extend(xBox3dClnEnc.io_types)
+                    # endif
 
-                       
+                    if bCamera:
+                        sContentId = sBasename + "_camera"
+                        xCameraCalibEnc = CameraCalibEncoder(
+                            content_id=sContentId,
+                            meta_data={},
+                            has_props=False)
+                        lTypes.extend(xCameraCalibEnc.io_types)
+                    # endif
+
+                    lExcludeLabelIds: list[str] = convert.DictElementToStringList(dicMetaExport, "lExcludeLabelIds", lDefault=[])
+
+                    self._dicLabelExport[xExport.sName] = CLabelExport(
+                        sName=xExport.sName,
+                        lDataType=xExport.lDataType,
+                        lLabelFilePaths=xExport.lArtFilePaths,
+                        lExcludeLabelIds=lExcludeLabelIds,
+                        xBox3dClnEnc=xBox3dClnEnc,
+                        xImgBox2dClnEnc=xImgBox2dClnEnc,
+                        xIdealImgBox2dClnEnc=xIdealImgBox2dClnEnc,
+                        xCameraCalibEnc=xCameraCalibEnc,
+                    )
+
+                    lMetaTypes.append(xtar.IOType(xtar.EDataType.JSON, xExport.sName, xtar.JsonWriterParams()))
+
+                else:
+                    self._funcStatus(f"  WARNING: Missing meta data 'mMeta/export' for label export: {xExport.sName}")
+                    self._funcStatus(f"  Ignoring artefact: {xExport.sName}")
+                    continue
+                # endif export meta data
 
             else:
                 self._funcStatus(f"  WARNING: Unsupported format: {xExport.lDataType[0]}")
@@ -567,17 +638,6 @@ class CProductExport:
 
             # endif
         # endfor
-
-        for sExportName in self._lLabelExportNames:
-            xExport = self._dicExport[sExportName]
-            self._funcIterInit(f"Parsing label artefacts for '{sExportName}'...", len(xExport.lArtFilePaths))
-            for iIdx, pathFile in enumerate(xExport.lArtFilePaths):
-                if not pathFile.exists():
-                    self._funcStatus(f"  WARNING: Missing artefact: {pathFile.as_posix()}")
-                    continue
-                # endif
-                
-            # endfor
 
         self._funcStatus(f"Exporting artefacts to: {pathXtar.as_posix()}")
         xWriter = xtar.ContiguousDatasetWriter(pathXtar, lTypes, samples_per_group=_iSamplesPerGroup, meta_writer_types=lMetaTypes)
@@ -601,12 +661,14 @@ class CProductExport:
         if _iMaxSamples > 0:
             iElementCount = min(iElementCount, _iMaxSamples)
         
-        # self._funcStatus("Writing artefacts...")
         self._funcIterInit("Writing artefacts...", iElementCount)
         for iIdx in range(iElementCount):
             self._funcIterUpdate(1, False)
             dicData: dict[str, Any] = {}
             for xType in lTypes:
+                if xType.content_id.startswith("__"):
+                    continue
+                # endif
                 xExport = self._dicExport[xType.content_id]
                 if iIdx < len(xExport.lArtFilePaths):
                     # Export OpenEXR images as numpy arrays
@@ -619,6 +681,19 @@ class CProductExport:
                     print(f"  WARNING: Missing artefact: {xType.content_id}")
                 # endif
             # endfor
+
+            for xLabelExport in self._dicLabelExport.values():
+                if iIdx < len(xLabelExport.lLabelFilePaths):
+                    if xLabelExport.lDataType[0] == "label" and xLabelExport.lDataType[1] == "json":
+                        dicData.update(self._Process_Label(xLabelExport.sName, xLabelExport.lLabelFilePaths[iIdx]))
+                    else:
+                        print(f"  WARNING: Unsupported label data type: {xLabelExport.sName}")
+                    # endif
+                else:
+                    print(f"  WARNING: Missing label artefact: {xLabelExport.sName}")
+                # endif
+            # endfor label export
+
             xWriter.add(**dicData)
         # endfor data
         self._funcIterUpdate(0, True)
@@ -645,6 +720,189 @@ class CProductExport:
         # endif
         return imgData
     # enddef
+
+    def _Process_Label(self, _sName: str, _sFilePath: str | Path) -> dict[str, Any]:
+        xLabelExport = self._dicLabelExport[_sName]
+        try:
+            dicData = anybase.file.LoadJson(_sFilePath)
+            anybase.config.AssertConfigType(dicData, "/anytruth/render/labeltypes/semseg:1")
+        except Exception as xEx:
+            raise CAnyError_Message(f"Failed to load label file for export type '{_sName}': {_sFilePath!s}", xEx) from xEx
+        # endtry
+
+        xBbox3dCln: BBox3DCollection | None = None
+        xImgBox2dCln: ImageBBox2DCollection | None = None
+        xIdealImgBox2dCln: ImageBBox2DCollection | None = None
+        xCameraCalib: CameraCalib | CameraCalibPanoPoly | None = None
+
+        if xLabelExport.xBox3dClnEnc is not None:
+            xBbox3dCln = BBox3DCollection(prop_ids={"label_id": str, "label_idx": int, "inst_idx": int, "inst_count": int, "names": list, "proj": dict})
+        # endif
+        if xLabelExport.xImgBox2dClnEnc is not None:
+            xImgBox2dCln = ImageBBox2DCollection(prop_ids={"label_id": str, "label_idx": int, "inst_idx": int, "inst_count": int, "names": list})
+        # endif
+        if xLabelExport.xIdealImgBox2dClnEnc is not None:
+            xIdealImgBox2dCln = ImageBBox2DCollection(prop_ids={"label_id": str, "label_idx": int, "inst_idx": int, "inst_count": int, "names": list})
+        # endif
+
+        lLabelTypes: list[dict[str, Any]] = dicData.get("lTypes", [])
+        for iLabelTypeIdx, dicLabelType in enumerate(lLabelTypes):
+            try:
+                sId = convert.DictElementToString(dicLabelType, "sId")
+                if sId in xLabelExport.lExcludeLabelIds:
+                    continue
+                # endif
+                iIdx = convert.DictElementToInt(dicLabelType, "iIdx")
+                iInstanceCount = convert.DictElementToInt(dicLabelType, "iInstanceCount")
+
+                # Parse lBoxes2D and store the data by instance index
+                dicInstBox2d: dict[str, Any] = {}
+                if xImgBox2dCln is not None:
+                    lBoxes2d: list[dict[str, Any]] = dicLabelType.get("lBoxes2D", [])
+                    for dicBox2d in lBoxes2d:
+                        iInstIdx = convert.DictElementToInt(dicBox2d, "iInstIdx")
+                        lRowRange = convert.DictElementToFloatList(dicBox2d, "lRowRange", lDefault=[0.0, 0.0])
+                        lColRange = convert.DictElementToFloatList(dicBox2d, "lColRange", lDefault=[0.0, 0.0])
+                        dicInstBox2d[iInstIdx] = {
+                            "row_col_min": (lRowRange[0], lColRange[0]),
+                            "row_col_max": (lRowRange[1], lColRange[1]),
+                        }
+
+                    # endfor
+                # endif
+                        
+                # Parse instance dict
+                dicInstances: dict[str, Any] = dicLabelType.get("mInstances", {})
+                dicProps = {"label_id": sId, "label_idx": iIdx, "inst_count": iInstanceCount}
+                for dicInst in dicInstances.values():
+                    iInstIdx = convert.DictElementToInt(dicInst, "iIdx")
+                    lNames = convert.DictElementToStringList(dicInst, "lNames", lDefault=[])
+                    dicProps["inst_idx"] = iInstIdx
+                    dicProps["names"] = lNames
+
+                    # Parse 3D box
+                    if xBbox3dCln is not None:
+                        dicBox3d: dict[str, Any] | None = dicInst.get("mBox3d")
+                        if dicBox3d is not None:
+                            dicProps3d = dicProps.copy()
+                            dicProps3d["proj"] = dicBox3d.get("mImage", {})
+                            lCenter = convert.DictElementToFloatList(dicBox3d, "lCenter", lDefault=[0.0, 0.0, 0.0])
+                            lSize = convert.DictElementToFloatList(dicBox3d, "lSize", lDefault=[0.0, 0.0, 0.0])
+                            lAxes = dicBox3d.get("lAxes", None)
+                            if lAxes is None or not isinstance(lAxes, list):
+                                raise CAnyError_Message(f"Element 'lAxes' in 'mBox3d' of label type '{sId}' is not a list: {type(lAxes)}")
+                            # endif
+                            lEuler = Rotation.from_matrix(np.array(lAxes)).as_euler("xyz", degrees=False).tolist()
+                            xBBox3d = BBox3D(position=tuple(lCenter), size=tuple(lSize), rotation=tuple(lEuler))
+                            xBbox3dCln.append(xBBox3d, dicProps3d)
+                        # endif
+                    # endif 3d box
+
+                    # Parse ideal 2d box
+                    if xIdealImgBox2dCln is not None:
+                        dicIdealBox2d: dict[str, Any] | None = dicInst.get("mBox2d")
+                        if dicIdealBox2d is not None:
+                            dicProps2d = dicProps.copy()
+                            lMinXY: list[float] = convert.DictElementToFloatList(dicIdealBox2d, "lMinXY", lDefault=[0.0, 0.0])
+                            lMaxXY: list[float] = convert.DictElementToFloatList(dicIdealBox2d, "lMaxXY", lDefault=[0.0, 0.0])
+                            xImgBox2d = ImageBBox2D(row_col_min=(lMinXY[1], lMinXY[0]), row_col_max=(lMaxXY[1], lMaxXY[0]))
+                            xIdealImgBox2dCln.append(xImgBox2d, dicProps2d)
+                        # endif
+                    # endif ideal box 2d
+                        
+                    # Parse 2d box
+                    if xImgBox2dCln is not None:
+                        dicItem: dict[str, Any] | None = dicInstBox2d.get(iInstIdx)
+                        if dicItem is not None:
+                            dicProps2d = dicProps.copy()
+                            xImgBox2d = ImageBBox2D(row_col_min=dicItem["row_col_min"], row_col_max=dicItem["row_col_max"])
+                            xImgBox2dCln.append(xImgBox2d, dicProps2d)
+                        # endif
+                # endfor instances
+            except Exception as xEx:
+                raise CAnyError_Message(f"Failed to parse label type {iLabelTypeIdx} of file {_sFilePath!s}", xEx) from xEx
+            # endtry
+        # endfor label types
+
+        dicCamera: dict[str, Any] | None = dicData.get("mCamera")
+        if xLabelExport.xCameraCalibEnc is not None:
+            if dicCamera is None:
+                raise CAnyError_Message(f"Missing camera calibration data in label file: {_sFilePath!s}")
+            # endif
+            try:
+                sDTI: str = convert.DictElementToString(dicCamera, "sDTI")
+                if config.CheckDti(sDTI, "/anycam/cameraview/pano/poly:1"):
+                    lPolyCoef_rad_mm: list[float] = convert.DictElementToFloatList(dicCamera, "lPolyCoef_rad_mm")
+                    lCenterOffsetXY_mm: list[float] = convert.DictElementToFloatList(dicCamera, "lCenterOffsetXY_mm", iLen=2)
+                    lPixCntXY: list[int] = convert.DictElementToIntList(dicCamera, "lPixCntXY", iLen=2)
+                    fPixSize_um: float = convert.DictElementToFloat(dicCamera, "fPixSize_um")
+                    lAspectXY: list[float] = convert.DictElementToFloatList(dicCamera, "lAspectXY", iLen=2)
+                    fFovMax_deg: float = convert.DictElementToFloat(dicCamera, "fFovMax_deg")
+                    lFovCenterXY_deg: list[float] = convert.DictElementToFloatList(dicCamera, "lFovCenterXY_deg", iLen=2)
+                    lFovRangeXY_deg: list[list[float]] | None = dicCamera.get("lFovRangeXY_deg")
+                    if lFovRangeXY_deg is None or not isinstance(lFovRangeXY_deg, list) or len(lFovRangeXY_deg) != 2 or not all(isinstance(x, list) and len(x) == 2 for x in lFovRangeXY_deg):
+                        raise CAnyError_Message(f"Element 'lFovRangeXY_deg' in 'mCamera' of label file '{_sFilePath!s}' is not a list of two lists.")
+                    # endif
+                    lCamAxes: list[list[float]] | None = dicCamera.get("lAxes", None)
+                    if lCamAxes is None or not isinstance(lCamAxes, list) or len(lCamAxes) != 3 or not all(isinstance(x, list) and len(x) == 3 for x in lCamAxes):
+                        raise CAnyError_Message(f"Element 'lAxes' in 'mCamera' of label file '{_sFilePath!s}' is not a list of three lists with three elements each.")
+                    # endif
+                    lOrig_m: list[float] = convert.DictElementToFloatList(dicCamera, "lOrig_m", iLen=3)
+
+                    lCtrOffXY_pix: list[float] = [x / fPixSize_um * 1e3 for x in lCenterOffsetXY_mm]
+                    lImgCtrXY_pix: list[float] = [lPixCntXY[0] / 2.0 + lCtrOffXY_pix[0], lPixCntXY[1] / 2.0 - lCtrOffXY_pix[1]]
+
+                    # Map axes to Computer Vision standard, where the x-axis is right, y-axis is down, and z-axis is forward.
+                    xCameraCalib = CameraCalibPanoPoly(
+                        resolution_xy = tuple(lPixCntXY),
+                        axes = np.array([
+                            lCamAxes[0],
+                            [-x for x in lCamAxes[1]],
+                            [-x for x in lCamAxes[2]],
+                        ], dtype=np.float32),
+                        origin = np.array(lOrig_m, dtype=np.float32),
+                        image_center_xy = tuple(lImgCtrXY_pix),
+                        fov_range_x_deg = tuple(lFovRangeXY_deg[0]),
+                        fov_range_y_deg = (-lFovRangeXY_deg[1][1], -lFovRangeXY_deg[1][0]),
+                        fov_center_offset_xy_deg = (lFovCenterXY_deg[0], -lFovCenterXY_deg[1]),
+                        fov_max_deg = fFovMax_deg,
+                        pixel_pitch_um = fPixSize_um,
+                        pixel_aspect_ratio = lAspectXY[1] / lAspectXY[0],
+                        poly_coef_rad_mm = np.array(lPolyCoef_rad_mm),
+                        center_offset_xy_mm = tuple(lCenterOffsetXY_mm),
+                    )
+                else:
+                    raise CAnyError_Message(f"Unsupported camera type '{sDTI}' for camera calibration in label file: {_sFilePath!s}")
+                # endif
+
+            except Exception as xEx:
+                raise CAnyError_Message(f"Failed to parse camera calibration data in label file: {_sFilePath!s}", xEx) from xEx
+            # endtry
+        # endif camera calibration
+
+        dicPacked: dict[str, Any] = {}
+        if xLabelExport.xBox3dClnEnc is not None:
+            dicPacked.update(xLabelExport.xBox3dClnEnc.pack(xBbox3dCln))
+        # endif
+
+        if xLabelExport.xImgBox2dClnEnc is not None:
+            dicPacked.update(xLabelExport.xImgBox2dClnEnc.pack(xImgBox2dCln))
+        # endif
+
+        if xLabelExport.xIdealImgBox2dClnEnc is not None:
+            dicPacked.update(xLabelExport.xIdealImgBox2dClnEnc.pack(xIdealImgBox2dCln))
+        # endif
+
+        if xLabelExport.xCameraCalibEnc is not None:
+            if xCameraCalib is None:
+                raise CAnyError_Message(f"Missing camera calibration data in label file: {_sFilePath!s}")
+            # endif
+            dicPacked.update(xLabelExport.xCameraCalibEnc.pack(xCameraCalib))
+        # endif
+
+        return dicPacked
+    # enddef
+        
 
 # endclass
 
