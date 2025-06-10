@@ -23,7 +23,7 @@
 import re
 import os
 import copy
-from datetime import datetime
+from datetime import datetime, timezone
 from pathlib import Path
 from typing import Iterator, Optional, Union, Callable
 
@@ -177,7 +177,7 @@ class CProducts:
         self._dicCfg = config.Load(_pathConfig, sDTI="/catharsys/production:1", bAddPathVars=False)
 
         fTime: float = os.path.getmtime(_pathConfig.as_posix())
-        self._dtProdFile = datetime.utcfromtimestamp(fTime)
+        self._dtProdFile = datetime.fromtimestamp(fTime, tz=timezone.utc)
 
         xParser = ison.Parser(self._xProject.xConfig.GetFilepathVarDict(_pathConfig), sImportPath=_pathConfig.parent)
         self._dicCfg = xParser.Process(self._dicCfg)
