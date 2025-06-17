@@ -20,7 +20,6 @@
 # </LICENSE>
 ###
 
-import copy
 import os
 import math
 import shutil
@@ -33,18 +32,27 @@ from dataclasses import dataclass
 from scipy.spatial.transform import Rotation
 
 import numpy as np
-import xtar
-from xtar_ml import (
-    BBox3D, 
-    BBox3dClnEncoder, 
-    BBox3DCollection,
-    ImageBBox2D,
-    ImageBBox2dClnEncoder,
-    ImageBBox2DCollection,
-    CameraCalib,
-    CameraCalibPanoPoly,
-    CameraCalibEncoder,
-)
+
+try:
+    import xtar
+    from xtar_ml import (
+        BBox3D, 
+        BBox3dClnEncoder, 
+        BBox3DCollection,
+        ImageBBox2D,
+        ImageBBox2dClnEncoder,
+        ImageBBox2DCollection,
+        CameraCalib,
+        CameraCalibPanoPoly,
+        CameraCalibEncoder,
+    )
+except ImportError as e:
+    raise ImportError(
+        "The packages 'xtar' and/or 'xtar-ml' are not installed.\n"
+        "These packages are currently only available in the proprietary Bosch Artifactory repository.\n"
+        "Please contact the maintainer of the 'image-render-automation' repository for more information.\n"
+    ) from e
+# endtry
 
 # from anybase import file as anyfile
 from anybase import path as anypath
@@ -165,11 +173,12 @@ class CProductExport:
             )
         # endif
     
-        self._dicGrpEx: dict[str, str] = self._xProds.FromFile(self._pathProdCfg, _bIgnoreGroupExceptions=True)
+        self._dicGrpEx: dict[str, str] = self._xProds.FromFile(self._pathProdCfg, _bIgnoreGroupExceptions=False)
 
         if self._sGroupName not in self._xProds.dicGroups:
             raise ValueError(
-                f"Group '{self._sGroupName}' not found in production configuration: {self._pathProdCfg.as_posix()}"
+                f"Group '{self._sGroupName}' not found in production configuration: {self._pathProdCfg.as_posix()}\n"
+                f"Available groups: {list(self._xProds.dicGroups.keys())}"
             )
         # endif
 
@@ -414,6 +423,11 @@ class CProductExport:
             for xArtCfg in lArtefactConfigs:
                 sArtType = xArtCfg.sArtType
                 xExport = self._dicExport[xArtCfg.sExportName]
+                if xNode is None:
+                    xExport.lArtMissing.append(lCfgIndices + [-1])
+                    self._bHasMissingArtefacts = True
+                    continue
+                # endif
 
                 for sArtIterIdx, sArtIterValue in enumerate(xArtCfg.lArtIterPath):
                     lArtPath: list[str] = xArtCfg.lArtMainPath + [sArtIterValue]

@@ -877,7 +877,7 @@ class CGroup:
     # enddef
 
     # ######################################################################################################
-    def GetGroupVarNode(self, _lGrpPath: list[str]) -> CNode:
+    def GetGroupVarNode(self, _lGrpPath: list[str]) -> CNode | None:
         xNode: CNode = self._xTree
         for sName in _lGrpPath:
             xNode = next((xChild for xChild in xNode.children if xChild.name == sName), None)
@@ -890,7 +890,7 @@ class CGroup:
     # enddef
 
     # ######################################################################################################
-    def GetArtVarNode(self, *, _xNode: CNode, _sArtType: str, _lArtPath: list[str]) -> CNode:
+    def GetArtVarNode(self, *, _xNode: CNode, _sArtType: str, _lArtPath: list[str]) -> CNode | None:
         xNode = next((xChild for xChild in _xNode.children if xChild.name == _sArtType), None)
         if xNode is None:
             return None
