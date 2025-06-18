@@ -74,6 +74,7 @@ from catharsys.api.cls_project import CProject
 
 os.environ["OPENCV_IO_ENABLE_OPENEXR"] = "1"
 import cv2
+import pandas as pd
 
 def _Status(sText: str):
     pass
@@ -477,11 +478,18 @@ class CProductExport:
                     lValLists.append(lValues)
                 # endfor
 
+                df = pd.DataFrame(lValLists, columns=xExport.lVarNames)
+                csv_path = pathFile.parent / f"{pathFile.stem}-{xExport.sName}.csv"
+                df.to_csv(csv_path, index=False)
+
                 dicData[xExport.sName] = {
-                    "lVarIds": xExport.lVarIds,
-                    "lVarNames": xExport.lVarNames,
-                    "lMissing": lValLists,
+                    "iMissingItemCount": len(lValLists),
+                    "sFilePath": csv_path.as_posix(),
+                #     "lVarIds": xExport.lVarIds,
+                #     "lVarNames": xExport.lVarNames,
+                #     "lMissing": lValLists,
                 }
+
             # endif
         # endfor
         anybase.file.SaveJson(pathFile, dicData, iIndent=4)
