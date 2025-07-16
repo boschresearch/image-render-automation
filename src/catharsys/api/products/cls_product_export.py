@@ -524,6 +524,7 @@ class CProductExport:
 
         lTypes: list[xtar.IOType] = []
         lMetaTypes: list[xtar.IOType] = []
+        dicMetaData: dict[str, Any] = {}
         self._dicLabelExport = {}
 
         iElementCount = 0
@@ -595,6 +596,7 @@ class CProductExport:
                     xBox3dClnEnc: BBox3dClnEncoder | None = None
                     xImgBox2dClnEnc: ImageBBox2dClnEncoder | None = None
                     xIdealImgBox2dClnEnc: ImageBBox2dClnEncoder | None = None
+                    xCameraCalibEnc: CameraCalibEncoder | None = None
                     
                     if bBox2d:
                         sContentId = sBasename + "_box2d"
@@ -602,6 +604,7 @@ class CProductExport:
                             content_id=sContentId,
                             meta_data={},
                             has_props=True)
+                        xImgBox2dClnEnc.to_meta(dicMetaData)
                         lTypes.extend(xImgBox2dClnEnc.io_types)
                     # endif
 
@@ -611,6 +614,7 @@ class CProductExport:
                             content_id=sContentId,
                             meta_data={},
                             has_props=True)
+                        xIdealImgBox2dClnEnc.to_meta(dicMetaData)
                         lTypes.extend(xIdealImgBox2dClnEnc.io_types)
                     # endif
                     
@@ -620,6 +624,7 @@ class CProductExport:
                             content_id=sContentId,
                             meta_data={},
                             has_props=True)
+                        xBox3dClnEnc.to_meta(dicMetaData)
                         lTypes.extend(xBox3dClnEnc.io_types)
                     # endif
 
@@ -629,6 +634,7 @@ class CProductExport:
                             content_id=sContentId,
                             meta_data={},
                             has_props=False)
+                        xCameraCalibEnc.to_meta(dicMetaData)
                         lTypes.extend(xCameraCalibEnc.io_types)
                     # endif
 
@@ -662,7 +668,13 @@ class CProductExport:
         # endfor
 
         self._funcStatus(f"Exporting artefacts to: {pathXtar.as_posix()}")
-        xWriter = xtar.ContiguousDatasetWriter(pathXtar, lTypes, samples_per_group=_iSamplesPerGroup, meta_writer_types=lMetaTypes)
+        xWriter = xtar.ContiguousDatasetWriter(
+            pathXtar,
+            lTypes,
+            samples_per_group=_iSamplesPerGroup,
+            meta_writer_types=lMetaTypes,
+            meta_data=dicMetaData,
+        )
 
         self._funcStatus("Writing meta data...")
         dicMeta = {}
