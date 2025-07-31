@@ -20,7 +20,6 @@
 # </LICENSE>
 ###
 
-import copy
 import os
 import math
 import shutil
@@ -33,18 +32,27 @@ from dataclasses import dataclass
 from scipy.spatial.transform import Rotation
 
 import numpy as np
-import xtar
-from xtar_ml import (
-    BBox3D, 
-    BBox3dClnEncoder, 
-    BBox3DCollection,
-    ImageBBox2D,
-    ImageBBox2dClnEncoder,
-    ImageBBox2DCollection,
-    CameraCalib,
-    CameraCalibPanoPoly,
-    CameraCalibEncoder,
-)
+
+try:
+    import xtar
+    from xtar_ml import (
+        BBox3D, 
+        BBox3dClnEncoder, 
+        BBox3DCollection,
+        ImageBBox2D,
+        ImageBBox2dClnEncoder,
+        ImageBBox2DCollection,
+        CameraCalib,
+        CameraCalibPanoPoly,
+        CameraCalibEncoder,
+    )
+except ImportError as e:
+    raise ImportError(
+        "The packages 'xtar' and/or 'xtar-ml' are not installed.\n"
+        "These packages are currently only available in the proprietary Bosch Artifactory repository.\n"
+        "Please contact the maintainer of the 'image-render-automation' repository for more information.\n"
+    ) from e
+# endtry
 
 # from anybase import file as anyfile
 from anybase import path as anypath
@@ -66,6 +74,7 @@ from catharsys.api.cls_project import CProject
 
 os.environ["OPENCV_IO_ENABLE_OPENEXR"] = "1"
 import cv2
+import pandas as pd
 
 def _Status(sText: str):
     pass
@@ -165,11 +174,12 @@ class CProductExport:
             )
         # endif
     
-        self._dicGrpEx: dict[str, str] = self._xProds.FromFile(self._pathProdCfg, _bIgnoreGroupExceptions=True)
+        self._dicGrpEx: dict[str, str] = self._xProds.FromFile(self._pathProdCfg, _bIgnoreGroupExceptions=False)
 
         if self._sGroupName not in self._xProds.dicGroups:
             raise ValueError(
-                f"Group '{self._sGroupName}' not found in production configuration: {self._pathProdCfg.as_posix()}"
+                f"Group '{self._sGroupName}' not found in production configuration: {self._pathProdCfg.as_posix()}\n"
+                f"Available groups: {list(self._xProds.dicGroups.keys())}"
             )
         # endif
 
@@ -414,6 +424,11 @@ class CProductExport:
             for xArtCfg in lArtefactConfigs:
                 sArtType = xArtCfg.sArtType
                 xExport = self._dicExport[xArtCfg.sExportName]
+                if xNode is None:
+                    xExport.lArtMissing.append(lCfgIndices + [-1])
+                    self._bHasMissingArtefacts = True
+                    continue
+                # endif
 
                 for sArtIterIdx, sArtIterValue in enumerate(xArtCfg.lArtIterPath):
                     lArtPath: list[str] = xArtCfg.lArtMainPath + [sArtIterValue]
@@ -463,11 +478,18 @@ class CProductExport:
                     lValLists.append(lValues)
                 # endfor
 
+                df = pd.DataFrame(lValLists, columns=xExport.lVarNames)
+                csv_path = pathFile.parent / f"{pathFile.stem}-{xExport.sName}.csv"
+                df.to_csv(csv_path, index=False)
+
                 dicData[xExport.sName] = {
-                    "lVarIds": xExport.lVarIds,
-                    "lVarNames": xExport.lVarNames,
-                    "lMissing": lValLists,
+                    "iMissingItemCount": len(lValLists),
+                    "sFilePath": csv_path.as_posix(),
+                #     "lVarIds": xExport.lVarIds,
+                #     "lVarNames": xExport.lVarNames,
+                #     "lMissing": lValLists,
                 }
+
             # endif
         # endfor
         anybase.file.SaveJson(pathFile, dicData, iIndent=4)
@@ -502,6 +524,7 @@ class CProductExport:
 
         lTypes: list[xtar.IOType] = []
         lMetaTypes: list[xtar.IOType] = []
+        dicMetaData: dict[str, Any] = {}
         self._dicLabelExport = {}
 
         iElementCount = 0
@@ -573,6 +596,7 @@ class CProductExport:
                     xBox3dClnEnc: BBox3dClnEncoder | None = None
                     xImgBox2dClnEnc: ImageBBox2dClnEncoder | None = None
                     xIdealImgBox2dClnEnc: ImageBBox2dClnEncoder | None = None
+                    xCameraCalibEnc: CameraCalibEncoder | None = None
                     
                     if bBox2d:
                         sContentId = sBasename + "_box2d"
@@ -580,6 +604,7 @@ class CProductExport:
                             content_id=sContentId,
                             meta_data={},
                             has_props=True)
+                        xImgBox2dClnEnc.to_meta(dicMetaData)
                         lTypes.extend(xImgBox2dClnEnc.io_types)
                     # endif
 
@@ -589,6 +614,7 @@ class CProductExport:
                             content_id=sContentId,
                             meta_data={},
                             has_props=True)
+                        xIdealImgBox2dClnEnc.to_meta(dicMetaData)
                         lTypes.extend(xIdealImgBox2dClnEnc.io_types)
                     # endif
                     
@@ -598,6 +624,7 @@ class CProductExport:
                             content_id=sContentId,
                             meta_data={},
                             has_props=True)
+                        xBox3dClnEnc.to_meta(dicMetaData)
                         lTypes.extend(xBox3dClnEnc.io_types)
                     # endif
 
@@ -607,6 +634,7 @@ class CProductExport:
                             content_id=sContentId,
                             meta_data={},
                             has_props=False)
+                        xCameraCalibEnc.to_meta(dicMetaData)
                         lTypes.extend(xCameraCalibEnc.io_types)
                     # endif
 
@@ -640,7 +668,13 @@ class CProductExport:
         # endfor
 
         self._funcStatus(f"Exporting artefacts to: {pathXtar.as_posix()}")
-        xWriter = xtar.ContiguousDatasetWriter(pathXtar, lTypes, samples_per_group=_iSamplesPerGroup, meta_writer_types=lMetaTypes)
+        xWriter = xtar.ContiguousDatasetWriter(
+            pathXtar,
+            lTypes,
+            samples_per_group=_iSamplesPerGroup,
+            meta_writer_types=lMetaTypes,
+            meta_data=dicMetaData,
+        )
 
         self._funcStatus("Writing meta data...")
         dicMeta = {}

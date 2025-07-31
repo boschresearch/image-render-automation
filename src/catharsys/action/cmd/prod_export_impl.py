@@ -23,27 +23,9 @@
 # </LICENSE>
 ###
 
-import re
-from pathlib import Path
 from tqdm import tqdm
 
-# from anybase import file as anyfile
-from anybase import path as anypath
-
-from typing import Optional
-
-from ison.util import data as isondata
-from anybase import assertion, convert
-from anybase.cls_any_error import CAnyError, CAnyError_Message
-
-from catharsys.config.cls_project import CProjectConfig
-from catharsys.action.cls_actionfactory import CActionFactory
-from catharsys.action.cls_actionclass_executor import CActionClassExecutor
-from catharsys.config.cls_job import CConfigJob
-
-from catharsys.api.cls_workspace import CWorkspace
-from catharsys.api.products.cls_products import CProducts
-from catharsys.api.cls_project import CProject
+from anybase.cls_any_error import CAnyError_Message
 from catharsys.api.products.cls_product_export import CProductExport
 
 xIterBar: tqdm = None
